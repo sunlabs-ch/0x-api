@@ -49,7 +49,6 @@ export const RFQM_NUM_BUCKETS = 1000;
 // API namespaces
 export const SRA_PATH = '/sra/v4';
 export const SWAP_PATH = '/swap/v1';
-export const META_TRANSACTION_PATH = '/meta_transaction/v1';
 export const METRICS_PATH = '/metrics';
 export const RFQM_PATH = '/rfqm/v1';
 export const ORDERBOOK_PATH = '/orderbook/v1';
