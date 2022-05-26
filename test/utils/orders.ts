@@ -1,6 +1,10 @@
 // tslint:disable:custom-no-magic-numbers
-import { LimitOrderFields, SignatureType, SupportedProvider } from '@0x/asset-swapper';
-import { getContractAddressesForChainOrThrow } from '@0x/contract-addresses';
+import {
+    LimitOrderFields,
+    SignatureType,
+    SupportedProvider,
+    getContractAddressesForChainOrThrow,
+} from '@0x/asset-swapper';
 import { getRandomInteger, randomAddress } from '@0x/contracts-test-utils';
 import { LimitOrder } from '@0x/protocol-utils';
 import { BigNumber, hexUtils } from '@0x/utils';

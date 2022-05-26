@@ -1,3 +1,4 @@
+import { ChainId, IdentityFillAdjustor } from '@0x/asset-swapper';
 import {
     AffiliateFeeAmount,
     AffiliateFeeType,
@@ -9,6 +10,7 @@ import {
     ERC20BridgeSource,
     FakeTakerContract,
     GetMarketOrdersRfqOpts,
+    NATIVE_FEE_TOKEN_BY_CHAIN_ID,
     Orderbook,
     RfqFirmQuoteValidator,
     SwapQuote,
@@ -17,12 +19,8 @@ import {
     SwapQuoter,
     SwapQuoteRequestOpts,
     SwapQuoterOpts,
-} from '@0x/asset-swapper';
-import {
-    NATIVE_FEE_TOKEN_BY_CHAIN_ID,
     ZERO_AMOUNT,
-} from '@0x/asset-swapper/lib/src/utils/market_operation_utils/constants';
-import { ChainId } from '@0x/contract-addresses';
+} from '@0x/asset-swapper';
 import { WETH9Contract } from '@0x/contract-wrappers';
 import { ETH_TOKEN_ADDRESS, RevertError } from '@0x/protocol-utils';
 import { getTokenMetadataIfExists, TokenMetadatasForChains } from '@0x/token-metadata';
@@ -49,6 +47,7 @@ import {
     WRAP_QUOTE_GAS,
 } from '../config';
 import {
+    DEFAULT_QUOTE_SLIPPAGE_PERCENTAGE,
     DEFAULT_VALIDATION_GAS_LIMIT,
     GAS_LIMIT_BUFFER_MULTIPLIER,
     NULL_ADDRESS,
@@ -80,6 +79,7 @@ import { RfqDynamicBlacklist } from '../utils/rfq_dyanmic_blacklist';
 import { SAMPLER_METRICS } from '../utils/sampler_metrics';
 import { serviceUtils } from '../utils/service_utils';
 import { SlippageModelManager } from '../utils/slippage_model_manager';
+import { SlippageModelFillAdjustor } from '../utils/sllippage_model_fill_adjustor';
 import { utils } from '../utils/utils';
 
 export class SwapService {
@@ -294,7 +294,7 @@ export class SwapService {
                 ...rfqt,
                 intentOnFilling: rfqt && rfqt.intentOnFilling ? true : false,
                 integrator: integrator!,
-                makerEndpointMaxResponseTimeMs: RFQT_REQUEST_MAX_RESPONSE_MS,
+                makerEndpointMaxResponseTimeMs: 15000 || RFQT_REQUEST_MAX_RESPONSE_MS,
                 // Note 0xAPI maps takerAddress query parameter to txOrigin as takerAddress is always Exchange Proxy or a VIP
                 takerAddress: NULL_ADDRESS,
                 txOrigin: takerAddress!,
@@ -329,6 +329,14 @@ export class SwapService {
             shouldGenerateQuoteReport,
             shouldIncludePriceComparisonsReport: !!includePriceComparisons,
             samplerMetrics: SAMPLER_METRICS,
+            fillAdjustor: this._slippageModelManager
+                ? new SlippageModelFillAdjustor(
+                      this._slippageModelManager,
+                      sellToken,
+                      buyToken,
+                      slippagePercentage || DEFAULT_QUOTE_SLIPPAGE_PERCENTAGE,
+                  )
+                : new IdentityFillAdjustor(),
         };
 
         const marketSide = sellAmount !== undefined ? MarketOperation.Sell : MarketOperation.Buy;
@@ -430,8 +438,8 @@ export class SwapService {
             }
         }
         // If any sources can be undeterministic in gas costs, we add a buffer
-        const hasUndeterministicFills = _.flatten(swapQuote.orders.map((order) => order.fills)).some((fill) =>
-            [ERC20BridgeSource.Native, ERC20BridgeSource.MultiBridge].includes(fill.source),
+        const hasUndeterministicFills = swapQuote.orders.some((order) =>
+            [ERC20BridgeSource.Native, ERC20BridgeSource.MultiBridge].includes(order.source),
         );
         const undeterministicMultiplier = hasUndeterministicFills ? GAS_LIMIT_BUFFER_MULTIPLIER : 1;
         // Add a buffer to get the worst case gas estimate
@@ -523,7 +531,6 @@ export class SwapService {
                 );
             }
         }
-
         return apiSwapQuote;
     }
 

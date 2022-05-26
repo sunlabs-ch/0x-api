@@ -1,3 +1,4 @@
+import { ERC20BridgeSource } from '@0x/asset-swapper';
 import { BigNumber } from '@0x/utils';
 import { Counter } from 'prom-client';
 

@@ -1,7 +1,6 @@
 import { isAPIError, isRevertError } from '@0x/api-utils';
 import { assert } from '@0x/assert';
-import { ERC20BridgeSource, Signature, SwapQuoterError } from '@0x/asset-swapper';
-import { ChainId } from '@0x/contract-addresses';
+import { ChainId, ERC20BridgeSource, Signature, SwapQuoterError } from '@0x/asset-swapper';
 import { getTokenMetadataIfExists, isNativeSymbolOrAddress } from '@0x/token-metadata';
 import { MarketOperation } from '@0x/types';
 import { BigNumber } from '@0x/utils';

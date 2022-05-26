@@ -7,9 +7,8 @@ import {
     rfqtMocker,
     RfqtQuoteEndpoint,
     Signature,
+    ContractAddresses,
 } from '@0x/asset-swapper';
-import { ContractAddresses } from '@0x/contract-addresses';
-import { WETH9Contract } from '@0x/contract-wrappers';
 import { DummyERC20TokenContract } from '@0x/contracts-erc20';
 import { expect } from '@0x/contracts-test-utils';
 import { BlockchainLifecycle, Web3Wrapper } from '@0x/dev-utils';

@@ -1,6 +1,7 @@
 // tslint:disable:max-file-line-count custom-no-magic-numbers
 import {
     BigNumber,
+    ContractAddresses,
     MockedRfqQuoteResponse,
     ProtocolFeeUtils,
     QuoteRequestor,
@@ -9,7 +10,6 @@ import {
     RfqtQuoteEndpoint,
     SignatureType,
 } from '@0x/asset-swapper';
-import { ContractAddresses } from '@0x/contract-addresses';
 import { expect, randomAddress } from '@0x/contracts-test-utils';
 import { MetaTransaction, MetaTransactionFields, RfqOrder } from '@0x/protocol-utils';
 import { generatePseudoRandom256BitNumber } from '@0x/utils';

@@ -9,9 +9,9 @@ import {
     QuoteRequestor,
     SignatureType,
     SignedNativeOrder,
+    getContractAddressesForChainOrThrow,
 } from '@0x/asset-swapper';
 import { ONE_SECOND_MS } from '@0x/asset-swapper/lib/src/utils/market_operation_utils/constants';
-import { getContractAddressesForChainOrThrow } from '@0x/contract-addresses';
 import { expect } from '@0x/contracts-test-utils';
 import { MetaTransaction, RfqOrder } from '@0x/protocol-utils';
 import { BigNumber } from '@0x/utils';

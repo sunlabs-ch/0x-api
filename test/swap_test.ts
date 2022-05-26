@@ -1,6 +1,5 @@
 // tslint:disable:max-file-line-count
-import { BUY_SOURCE_FILTER_BY_CHAIN_ID, ERC20BridgeSource, LimitOrderFields } from '@0x/asset-swapper';
-import { ChainId } from '@0x/contract-addresses';
+import { BUY_SOURCE_FILTER_BY_CHAIN_ID, ERC20BridgeSource, LimitOrderFields, ChainId } from '@0x/asset-swapper';
 import { WETH9Contract } from '@0x/contract-wrappers';
 import { DummyERC20TokenContract } from '@0x/contracts-erc20';
 import { assertRoughlyEquals, expect, getRandomInteger, randomAddress } from '@0x/contracts-test-utils';

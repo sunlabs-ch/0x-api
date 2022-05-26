@@ -1,12 +1,12 @@
 import {
+    ChainId,
     DEFAULT_GAS_SCHEDULE,
     ERC20BridgeSource,
-    FeeSchedule,
+    GasSchedule,
     PriceComparisonsReport,
     SELL_SOURCE_FILTER_BY_CHAIN_ID,
     UniswapV2FillData,
 } from '@0x/asset-swapper';
-import { ChainId } from '@0x/contract-addresses';
 import { getTokenMetadataIfExists } from '@0x/token-metadata';
 import { MarketOperation } from '@0x/types';
 import { BigNumber } from '@0x/utils';
@@ -20,7 +20,7 @@ import { SourceComparison } from '../types';
 
 // NOTE: Our internal Uniswap gas usage may be lower than the Uniswap UI usage
 // Therefore we need to adjust the gas estimates to be representative of using the Uniswap UI.
-const gasScheduleWithOverrides: FeeSchedule = {
+const gasScheduleWithOverrides: GasSchedule = {
     ...DEFAULT_GAS_SCHEDULE,
     [ERC20BridgeSource.UniswapV2]: (fillData) => {
         let gas = 1.5e5;

@@ -2,8 +2,7 @@
 // tslint:disable:no-empty
 // tslint:disable:max-file-line-count
 
-import { ERC20BridgeSource } from '@0x/asset-swapper';
-import { ChainId } from '@0x/contract-addresses';
+import { ChainId, ERC20BridgeSource } from '@0x/asset-swapper';
 import { expect } from '@0x/contracts-test-utils';
 import { getTokenMetadataIfExists } from '@0x/token-metadata';
 import { MarketOperation } from '@0x/types';

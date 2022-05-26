@@ -1,6 +1,7 @@
 import { HttpServiceConfig as BaseHttpConfig } from '@0x/api-utils';
 import {
     AffiliateFeeType,
+    ChainId,
     ContractAddresses,
     ERC20BridgeSource,
     ExtendedQuoteReportSources,
@@ -11,7 +12,6 @@ import {
     Signature,
     SupportedProvider,
 } from '@0x/asset-swapper';
-import { ChainId } from '@0x/contract-addresses';
 import { ExchangeProxyMetaTransaction, ZeroExTransaction } from '@0x/types';
 import { BigNumber } from '@0x/utils';
 
