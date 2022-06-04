@@ -19,6 +19,7 @@ import * as HttpStatus from 'http-status-codes';
 import { Kafka, Producer } from 'kafkajs';
 import _ = require('lodash');
 import { Counter, Histogram } from 'prom-client';
+import { Web3Wrapper } from '@0x/web3-wrapper';
 
 import {
     CHAIN_ID,
@@ -31,6 +32,7 @@ import {
     RFQT_API_KEY_WHITELIST,
     RFQT_INTEGRATOR_IDS,
     RFQT_REGISTRY_PASSWORDS,
+    ASSET_SWAPPER_MARKET_ORDERS_OPTS,
 } from '../config';
 import {
     AFFILIATE_DATA_SELECTOR,
@@ -50,7 +52,12 @@ import {
 } from '../errors';
 import { schemas } from '../schemas';
 import { SwapService } from '../services/swap_service';
-import { GetSwapPriceResponse, GetSwapQuoteParams, GetSwapQuoteResponse } from '../types';
+import {
+    GetSwapPriceResponse,
+    GetSwapQuoteParams,
+    GetSwapQuoteResponse,
+    TokenMetadata,
+} from '../types';
 import { findTokenAddressOrThrowApiError } from '../utils/address_utils';
 import { paginationUtils } from '../utils/pagination_utils';
 import { parseUtils } from '../utils/parse_utils';
@@ -83,6 +90,11 @@ const HTTP_SWAP_RESPONSE_TIME = new Histogram({
     help: 'The response time of a HTTP Swap request',
     buckets: PROMETHEUS_REQUEST_BUCKETS,
 });
+
+interface Price {
+    symbol: string;
+    price: number;
+};
 
 export class SwapHandlers {
     private readonly _swapService: SwapService;
@@ -128,6 +140,48 @@ export class SwapHandlers {
 
     constructor(swapService: SwapService) {
         this._swapService = swapService;
+    }
+
+    public async getTokensHistory(req: express.Request, res: express.Response): Promise<void> {
+        const buyTokens: TokenMetadata[] = req.body.buyTokens;
+        if (!buyTokens) {
+            throw new ValidationError([
+                {
+                    field: 'buyTokens',
+                    code: ValidationErrorCodes.RequiredField,
+                    reason: `not found`,
+                },
+            ]);
+        }
+        const buyAddresses = buyTokens.map((t) => t.tokenAddress.toLowerCase());
+        const buyAmounts = buyTokens.map((t) => Web3Wrapper.toBaseUnitAmount(1, t.decimals));
+        const quotes = await this._swapService._swapQuoter.getBatchMarketBuySwapQuoteAsync(
+            buyAddresses,
+            "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+            buyAmounts,
+            {
+                ...ASSET_SWAPPER_MARKET_ORDERS_OPTS,
+                bridgeSlippage: 0,
+                maxFallbackSlippage: 0,
+                numSamples: 1,
+                gasPrice: new BigNumber(1),
+            },
+        );
+        let prices: Price[] = [];
+        quotes.forEach((q, i) => {
+            const { symbol, decimals } = buyTokens[i];
+            const { makerAmount, totalTakerAmount } = q.bestCaseQuoteInfo;
+            const unitMakerAmount = Web3Wrapper.toUnitAmount(makerAmount, decimals);
+            const unitTakerAmount = Web3Wrapper.toUnitAmount(totalTakerAmount, 6);
+            const price = unitTakerAmount
+                .dividedBy(unitMakerAmount)
+                .decimalPlaces(6, BigNumber.ROUND_CEIL);
+            prices.push({
+                symbol: symbol,
+                price: price.toNumber()
+            });
+        });
+        res.json(prices);
     }
 
     public async getTokenPricesAsync(req: express.Request, res: express.Response): Promise<void> {

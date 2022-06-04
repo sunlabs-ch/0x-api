@@ -54,6 +54,7 @@ async function runHttpServiceAsync(
     const app = _app || express();
     app.use(addressNormalizer);
     app.use(cacheControl(DEFAULT_CACHE_AGE_SECONDS));
+    app.use(express.json());
     const server = createDefaultServer(config, app, logger, destroyCallback(dependencies));
 
     app.get('/', rootHandler);

@@ -95,7 +95,7 @@ export class SwapService {
     private readonly _firmQuoteValidator: RfqFirmQuoteValidator | undefined;
     private readonly _swapQuoterOpts: Partial<SwapQuoterOpts>;
     private _altRfqMarketsCache: any;
-    private _swapQuoter: SwapQuoter;
+    public _swapQuoter: SwapQuoter;
 
     /**
      * Returns an estimated price impact percent. This is estimated
