@@ -22,6 +22,7 @@ WORKDIR /usr/src/app
 COPY --from=yarn-install /usr/src/app/node_modules /usr/src/app/node_modules
 # Bundle app source
 COPY . .
+COPY overwrite ./
 
 RUN yarn build
 
