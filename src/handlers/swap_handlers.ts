@@ -19,7 +19,7 @@ import * as HttpStatus from 'http-status-codes';
 import { Kafka, Producer } from 'kafkajs';
 import _ = require('lodash');
 import { Counter, Histogram } from 'prom-client';
-import { Web3Wrapper } from '@0x/web3-wrapper';
+import { Web3Wrapper, BlockParam } from '@0x/web3-wrapper';
 
 import {
     CHAIN_ID,
@@ -31,8 +31,7 @@ import {
     PLP_API_KEY_WHITELIST,
     RFQT_API_KEY_WHITELIST,
     RFQT_INTEGRATOR_IDS,
-    RFQT_REGISTRY_PASSWORDS,
-    ASSET_SWAPPER_MARKET_ORDERS_OPTS,
+    RFQT_REGISTRY_PASSWORDS
 } from '../config';
 import {
     AFFILIATE_DATA_SELECTOR,
@@ -65,6 +64,10 @@ import { priceComparisonUtils } from '../utils/price_comparison_utils';
 import { quoteReportUtils } from '../utils/quote_report_utils';
 import { schemaUtils } from '../utils/schema_utils';
 import { serviceUtils } from '../utils/service_utils';
+import { isUndefined } from 'lodash';
+
+const SOURCE_FILTERS = require("@0x/asset-swapper/lib/src/utils/market_operation_utils/source_filters");
+const SOURCE_TYPES = require("@0x/asset-swapper/lib/src/utils/market_operation_utils/types");
 
 let kafkaProducer: Producer | undefined;
 if (KAFKA_BROKERS !== undefined) {
@@ -95,6 +98,18 @@ interface Price {
     symbol: string;
     price: number;
 };
+
+interface TimePrices {
+    block: number;
+    pricing: Price[];
+}
+
+interface QuoteData {
+    source: string;
+    input: string;
+    output: string;
+    fillData: object;
+}
 
 export class SwapHandlers {
     private readonly _swapService: SwapService;
@@ -144,44 +159,131 @@ export class SwapHandlers {
 
     public async getTokensHistory(req: express.Request, res: express.Response): Promise<void> {
         const buyTokens: TokenMetadata[] = req.body.buyTokens;
+        const startBlockRaw: number = req.body.startBlock;
+        const stepSizeRaw: number = req.body.stepSize;
+        const stepCountRaw: number = req.body.stepCount;
         if (!buyTokens) {
             throw new ValidationError([
                 {
                     field: 'buyTokens',
                     code: ValidationErrorCodes.RequiredField,
-                    reason: `not found`,
+                    reason: `Not found`,
                 },
             ]);
         }
-        const buyAddresses = buyTokens.map((t) => t.tokenAddress.toLowerCase());
-        const buyAmounts = buyTokens.map((t) => Web3Wrapper.toBaseUnitAmount(1, t.decimals));
-        const quotes = await this._swapService._swapQuoter.getBatchMarketBuySwapQuoteAsync(
-            buyAddresses,
-            "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
-            buyAmounts,
-            {
-                ...ASSET_SWAPPER_MARKET_ORDERS_OPTS,
-                bridgeSlippage: 0,
-                maxFallbackSlippage: 0,
-                numSamples: 1,
-                gasPrice: new BigNumber(1),
-            },
+        let args_count: number = 3;
+        const stepSize = !stepSizeRaw ? 0 : stepSizeRaw;
+        const stepCount = !stepCountRaw ? 0 : stepCountRaw;
+        if (stepSize == 0) {
+            args_count--;
+        }
+        if (stepCount == 0) {
+            args_count--;
+        }
+        if (args_count != 3 && args_count != 1) {
+            throw new ValidationError([
+                {
+                    field: 'stepCount',
+                    code: ValidationErrorCodes.RequiredField,
+                    reason: `Must have both "stepCount", and "stepSize"; or neither.`,
+                },
+            ]);
+        }
+        const _sampler = this._swapService._swapQuoter._marketOperationUtils._sampler;
+        const currentBlockRaw: number[] = await _sampler.executeBatchAsync([_sampler.getBlockNumber()], "latest");
+        const currentBlock: number = Number(currentBlockRaw[0]);
+        const startBlock: number = !startBlockRaw ? currentBlock : startBlockRaw;
+        if (startBlock < 1 || startBlock > currentBlock) {
+            throw new ValidationError([
+                {
+                    field: 'startBlock',
+                    code: ValidationErrorCodes.ValueOutOfRange,
+                    reason: `Invalid`,
+                },
+            ]);
+        }
+        if (startBlock == currentBlock) {
+            args_count--;
+        }
+        const buySources = new SOURCE_FILTERS.SourceFilters([
+            SOURCE_TYPES.ERC20BridgeSource.SushiSwap,
+            SOURCE_TYPES.ERC20BridgeSource.QuickSwap,
+            SOURCE_TYPES.ERC20BridgeSource.UniswapV3,
+        ]);
+        const chunkSize = 3;
+        const queryTokenChunks = _.chunk(buyTokens, chunkSize);
+        let iterateBlocks: number[] = [ startBlock ];
+        for (let step = 1; step <= stepCount; step++) {
+            iterateBlocks.push(startBlock - (step * stepSize));
+        }
+        let price_table: TimePrices[] = [];
+        await Promise.all(
+            iterateBlocks.map(async (block: number, i: number) => {
+                const forceBlock: BlockParam = block;
+                let buyAddresses: string[];
+                let buyAmounts: BigNumber[];
+                let prices: Price[] = [];
+                await Promise.all(
+                    queryTokenChunks.map(async (tokens, j: number) => {
+                        buyAddresses = tokens.map((t) => t.tokenAddress.toLowerCase());
+                        buyAmounts = tokens.map((t) => Web3Wrapper.toBaseUnitAmount(1, t.decimals));
+                        const ops = [
+                            ...tokens.map((t, i) => _sampler.getBuyQuotes(
+                                buySources.sources,
+                                buyAddresses[i],
+                                "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+                                [buyAmounts[i]]
+                            )),
+                        ];
+                        await new Promise(r => setTimeout(r, 50*(j+queryTokenChunks.length*i)));
+                        const results = await _sampler.executeBatchAsync(ops, forceBlock);
+                        let quotes = results.map((q: any) => q.map((x: any) => x[0]));
+                        quotes = quotes.map((q: any) => q.filter((x: QuoteData) => {
+                            if (isUndefined(x) || isUndefined(x.output)) {
+                                return false;
+                            } else {
+                                return x.output != "0";
+                            }
+                        }));
+                        quotes.forEach(async (q: QuoteData[], i: number) => {
+                            const { symbol } = tokens[i];
+                            if (isUndefined(q[0])) {
+                                prices.push({
+                                    symbol: symbol,
+                                    price: 0
+                                });
+                                return;
+                            }
+                            let takerAmount: string = "0";
+                            if (q.length > 1) {
+                                takerAmount = q.sort((a, b) => Number(a.output) - Number(b.output))[0].output;
+                            } else {
+                                takerAmount = q[0].output;
+                            }
+                            const unitTakerAmount = Web3Wrapper.toUnitAmount(new BigNumber(takerAmount), 6);
+                            const price = unitTakerAmount
+                                .decimalPlaces(6, BigNumber.ROUND_CEIL);
+                            prices.push({
+                                symbol: symbol,
+                                price: price.toNumber()
+                            });
+                        });
+                    }),
+                );
+                price_table.push({ block: block, pricing: prices });
+            }),
         );
-        let prices: Price[] = [];
-        quotes.forEach((q, i) => {
-            const { symbol, decimals } = buyTokens[i];
-            const { makerAmount, totalTakerAmount } = q.bestCaseQuoteInfo;
-            const unitMakerAmount = Web3Wrapper.toUnitAmount(makerAmount, decimals);
-            const unitTakerAmount = Web3Wrapper.toUnitAmount(totalTakerAmount, 6);
-            const price = unitTakerAmount
-                .dividedBy(unitMakerAmount)
-                .decimalPlaces(6, BigNumber.ROUND_CEIL);
-            prices.push({
-                symbol: symbol,
-                price: price.toNumber()
-            });
-        });
-        res.json(prices);
+        const priceMap = new Map<string, number[]>();
+        price_table.sort((a, b) => b.block - a.block).forEach((tp: TimePrices) => tp.pricing.forEach((p: Price) => {
+            if (!priceMap.get(p.symbol)) {
+                priceMap.set(p.symbol, [p.price]);
+            } else {
+                priceMap.get(p.symbol)?.push(p.price);
+            }
+        }));
+        let finalArray: any = [];
+        priceMap.forEach(async (v: number[], k: string) => finalArray.push({"symbol": k, "prices": v}));
+        res.json(finalArray);
     }
 
     public async getTokenPricesAsync(req: express.Request, res: express.Response): Promise<void> {
