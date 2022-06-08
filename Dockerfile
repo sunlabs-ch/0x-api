@@ -50,6 +50,14 @@ RUN mkdir -p "$PGDATA" && \
 	chmod 750 "$PGDATA"
 
 RUN sudo -E -u postgres initdb -D "$PGDATA"
+
+ENV CHAIN_ID=137
+ENV ETHEREUM_RPC_URL=https://polygon-rpc.com
+ENV HTTP_PORT=8080
+ENV HTTP_KEEP_ALIVE_TIMEOUT=60000
+ENV HTTP_HEADERS_TIMEOUT=60000
+ENV RPC_REQUEST_TIMEOUT=60000
+
 RUN sudo -u postgres postgres -D "$PGDATA" & \
 printf "\
 set timeout -1\n\
@@ -61,12 +69,6 @@ send \"api\\n\"\n\
 expect eof\n\
 " | sudo -E -u postgres expect && \
 sleep 5 && sudo -E -u postgres createdb -O api api && yarn db:migrate && sleep 5 && killall -s SIGINT postgres && sleep 10
-
-ENV CHAIN_ID=137
-ENV HTTP_PORT=8080
-ENV HTTP_KEEP_ALIVE_TIMEOUT=60000
-ENV HTTP_HEADERS_TIMEOUT=60000
-ENV RPC_REQUEST_TIMEOUT=60000
 
 EXPOSE 8080
 CMD ["pm2-runtime", "ecosystem.config.js"]
