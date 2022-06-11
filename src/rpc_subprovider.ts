@@ -92,12 +92,13 @@ export class RPCSubprovider extends Subprovider {
         ETH_RPC_REQUESTS.labels(finalPayload.method!).inc();
         const begin = Date.now();
 
-        let response: AxiosResponse;
+        let response: AxiosResponse =
+            {data: undefined, status: 500, statusText: "Undefined", headers: undefined, config: {}};
         const rpcUrl = this._rpcUrls[Math.floor(Math.random() * this._rpcUrls.length)];
         const body = await this._encodeRequestPayloadAsync(finalPayload);
         ETH_RPC_REQUEST_SIZE_SUMMARY.labels(finalPayload.method!).observe(Buffer.byteLength(body, 'utf8'));
-        try {
-            response = await axios.post(
+        const retryable = async () => { 
+            return await axios.post(
                 rpcUrl,
                 finalPayload,
                 {
@@ -107,13 +108,22 @@ export class RPCSubprovider extends Subprovider {
                     timeout: this._requestTimeoutMs,
                 }
             );
-        } catch (err) {
-            ETH_RPC_REQUEST_ERROR.labels(finalPayload.method!).inc();
-            end(new JsonRpcError.InternalError(err));
-            return;
-        } finally {
-            const duration = (Date.now() - begin) / ONE_SECOND_MS;
-            ETH_RPC_RESPONSE_TIME.labels(finalPayload.method!).observe(duration);
+        };
+        for (let i = 0; i < 5; i++) {
+            try {
+                response = await retryable();
+                if (!isUndefined(response.data.error)) {
+                    continue;
+                }
+            } catch (err) {
+                ETH_RPC_REQUEST_ERROR.labels(finalPayload.method!).inc();
+                end(new JsonRpcError.InternalError(err));
+                return;
+            } finally {
+                const duration = (Date.now() - begin) / ONE_SECOND_MS;
+                ETH_RPC_RESPONSE_TIME.labels(finalPayload.method!).observe(duration);
+            }
+            break;
         }
 
         const text = response.data;
