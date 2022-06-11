@@ -235,7 +235,6 @@ export class SwapHandlers {
                                 [buyAmounts[i]]
                             )),
                         ];
-                        await new Promise(r => setTimeout(r, 55*(j+queryTokenChunks.length*i)));
                         const results = await _sampler.executeBatchAsync(ops, forceBlock);
                         let quotes = results.map((q: any) => q.map((x: any) => x[0]));
                         quotes = quotes.map((q: any) => q.filter((x: QuoteData) => {

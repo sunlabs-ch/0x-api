@@ -1,5 +1,6 @@
 import Axios, { AxiosPromise, AxiosRequestConfig } from 'axios';
 import * as rax from 'retry-axios';
+import axiosThrottle from "axios-request-throttle";
 
 import { logger } from '../logger';
 
@@ -18,7 +19,7 @@ const DEFAULT_RETRY_CONFIG: rax.RetryConfig = {
     },
 };
 
-const retryableAxiosInstance = Axios.create();
+export const retryableAxiosInstance = Axios.create();
 export const retryableAxios = (config: AxiosRequestConfig): AxiosPromise => {
     return retryableAxiosInstance({
         ...config,
@@ -29,5 +30,8 @@ export const retryableAxios = (config: AxiosRequestConfig): AxiosPromise => {
         },
     });
 };
+
 // Attach retry-axios only to our specific instance
 rax.attach(retryableAxiosInstance);
+
+axiosThrottle.use(retryableAxiosInstance, { requestsPerSecond: 60 });

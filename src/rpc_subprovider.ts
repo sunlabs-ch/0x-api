@@ -5,15 +5,18 @@ import { JSONRPCRequestPayload } from 'ethereum-types';
 import * as http from 'http';
 import * as https from 'https';
 import JsonRpcError = require('json-rpc-error');
-import fetch, { Headers, Response } from 'node-fetch';
+//import fetch, { Headers, Response } from 'node-fetch';
 import { Counter, Histogram, Summary } from 'prom-client';
 import { gzip } from 'zlib';
+import { retryableAxiosInstance as axios } from './utils/axios_utils';
 
 import { ONE_SECOND_MS, PROMETHEUS_REQUEST_BUCKETS } from './constants';
+import { AxiosResponse } from 'axios';
+import { isEmpty, isUndefined } from 'lodash';
 
 const httpAgent = new http.Agent({ keepAlive: true });
 const httpsAgent = new https.Agent({ keepAlive: true });
-const agent = (_parsedURL: any) => (_parsedURL.protocol === 'http:' ? httpAgent : httpsAgent);
+//const agent = (_parsedURL: any) => (_parsedURL.protocol === 'http:' ? httpAgent : httpsAgent);
 
 const ETH_RPC_RESPONSE_TIME = new Histogram({
     name: 'eth_rpc_response_time',
@@ -89,19 +92,21 @@ export class RPCSubprovider extends Subprovider {
         ETH_RPC_REQUESTS.labels(finalPayload.method!).inc();
         const begin = Date.now();
 
-        let response: Response;
+        let response: AxiosResponse;
         const rpcUrl = this._rpcUrls[Math.floor(Math.random() * this._rpcUrls.length)];
         const body = await this._encodeRequestPayloadAsync(finalPayload);
         ETH_RPC_REQUEST_SIZE_SUMMARY.labels(finalPayload.method!).observe(Buffer.byteLength(body, 'utf8'));
         try {
-            response = await fetch(rpcUrl, {
-                method: 'POST',
-                headers,
-                body,
-                timeout: this._requestTimeoutMs,
-                compress: true,
-                agent,
-            });
+            response = await axios.post(
+                rpcUrl,
+                finalPayload,
+                {
+                    headers,
+                    httpAgent,
+                    httpsAgent,
+                    timeout: this._requestTimeoutMs,
+                }
+            );
         } catch (err) {
             ETH_RPC_REQUEST_ERROR.labels(finalPayload.method!).inc();
             end(new JsonRpcError.InternalError(err));
@@ -111,9 +116,9 @@ export class RPCSubprovider extends Subprovider {
             ETH_RPC_RESPONSE_TIME.labels(finalPayload.method!).observe(duration);
         }
 
-        const text = await response.text();
+        const text = response.data;
 
-        if (!response.ok) {
+        if (response.status !== 200) {
             ETH_RPC_REQUEST_ERROR.labels(finalPayload.method!).inc();
             const statusCode = response.status;
             switch (statusCode) {
@@ -131,7 +136,7 @@ export class RPCSubprovider extends Subprovider {
                     return;
             }
         }
-
+/*
         let data;
         try {
             data = JSON.parse(text);
@@ -146,8 +151,13 @@ export class RPCSubprovider extends Subprovider {
             end(data.error);
             return;
         }
+*/
         ETH_RPC_REQUEST_SUCCESS.labels(finalPayload.method!).inc();
-        end(null, data.result);
+        if (isEmpty(text.result) || isUndefined(text.result)) {
+            console.log(finalPayload);
+            console.log(text);
+        }
+        end(null, text.result);
     }
 
     private async _encodeRequestPayloadAsync(finalPayload: Partial<JSONRPCRequestPayloadWithMethod>): Promise<Buffer> {
