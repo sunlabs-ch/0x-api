@@ -113,9 +113,14 @@ export class RPCSubprovider extends Subprovider {
             try {
                 response = await retryable();
                 if (!isUndefined(response.data.error)) {
+                    await new Promise(r => setTimeout(r, 1000));
                     continue;
                 }
             } catch (err) {
+                if (i !== 4) {
+                    await new Promise(r => setTimeout(r, 1000));
+                    continue;
+                }
                 ETH_RPC_REQUEST_ERROR.labels(finalPayload.method!).inc();
                 end(new JsonRpcError.InternalError(err));
                 return;
