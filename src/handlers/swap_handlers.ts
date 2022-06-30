@@ -209,6 +209,7 @@ export class SwapHandlers {
             SOURCE_TYPES.ERC20BridgeSource.SushiSwap,
             SOURCE_TYPES.ERC20BridgeSource.QuickSwap,
             SOURCE_TYPES.ERC20BridgeSource.UniswapV3,
+            SOURCE_TYPES.ERC20BridgeSource.BalancerV2
         ]);
         const chunkSize = 3;
         const queryTokenChunks = _.chunk(buyTokens, chunkSize);
