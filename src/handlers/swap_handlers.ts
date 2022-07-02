@@ -162,6 +162,7 @@ export class SwapHandlers {
         const startBlockRaw: number = req.body.startBlock;
         const stepSizeRaw: number = req.body.stepSize;
         const stepCountRaw: number = req.body.stepCount;
+        const precise: boolean = req.body.precise || false;
         if (!buyTokens) {
             throw new ValidationError([
                 {
@@ -205,13 +206,19 @@ export class SwapHandlers {
         if (startBlock == currentBlock) {
             args_count--;
         }
-        const buySources = new SOURCE_FILTERS.SourceFilters([
-            SOURCE_TYPES.ERC20BridgeSource.SushiSwap,
-            SOURCE_TYPES.ERC20BridgeSource.QuickSwap,
-            SOURCE_TYPES.ERC20BridgeSource.BalancerV2,
-            SOURCE_TYPES.ERC20BridgeSource.UniswapV3,
-            SOURCE_TYPES.ERC20BridgeSource.MultiHop
-        ]);
+        const buySources = precise ?
+            new SOURCE_FILTERS.SourceFilters([
+                SOURCE_TYPES.ERC20BridgeSource.SushiSwap,
+                SOURCE_TYPES.ERC20BridgeSource.QuickSwap,
+                SOURCE_TYPES.ERC20BridgeSource.BalancerV2,
+                SOURCE_TYPES.ERC20BridgeSource.UniswapV3,
+                SOURCE_TYPES.ERC20BridgeSource.MultiHop
+            ]) :
+            new SOURCE_FILTERS.SourceFilters([
+                SOURCE_TYPES.ERC20BridgeSource.SushiSwap,
+                SOURCE_TYPES.ERC20BridgeSource.QuickSwap,
+                SOURCE_TYPES.ERC20BridgeSource.UniswapV3
+            ]);
         const chunkSize = 1;
         const queryTokenChunks = _.chunk(buyTokens, chunkSize);
         let iterateBlocks: number[] = [ startBlock ];
@@ -229,7 +236,7 @@ export class SwapHandlers {
                     queryTokenChunks.map(async (tokens, j: number) => {
                         buyAddresses = tokens.map((t) => t.tokenAddress.toLowerCase());
                         buyAmounts = tokens.map((t) => Web3Wrapper.toBaseUnitAmount(1, t.decimals));
-                        const ops = [
+                        const ops = precise ? [
                             ...tokens.map((t, i) => _sampler.getBuyQuotes(
                                 buySources.sources,
                                 buyAddresses[i],
@@ -242,13 +249,26 @@ export class SwapHandlers {
                                 "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
                                 buyAmounts[i]
                             )),
+                        ] :
+                        [
+                            ...tokens.map((t, i) => _sampler.getBuyQuotes(
+                                buySources.sources,
+                                buyAddresses[i],
+                                "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+                                [buyAmounts[i]]
+                            )),
                         ];
                         const results = await _sampler.executeBatchAsync(ops, forceBlock);
-                        const singles = results.slice(0, tokens.length);
-                        const multis = results.slice(tokens.length);
-                        let quotes = tokens.map((t, i) => {
-                            return [... singles[i].flat(), ... multis[i]];
-                        });
+                        let quotes;
+                        if (precise) {
+                            const singles = results.slice(0, tokens.length);
+                            const multis = results.slice(tokens.length);
+                            quotes = tokens.map((t, i) => {
+                                return [...singles[i].flat(), ...multis[i]];
+                            });
+                        } else {
+                            quotes = results.map((q: any) => q.map((x: any) => x[0]));
+                        }
                         quotes = quotes.map((q: any) => q.filter((x: QuoteData) => {
                             if (isUndefined(x) || isUndefined(x.output)) {
                                 return false;
