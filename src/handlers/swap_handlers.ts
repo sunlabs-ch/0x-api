@@ -208,10 +208,11 @@ export class SwapHandlers {
         const buySources = new SOURCE_FILTERS.SourceFilters([
             SOURCE_TYPES.ERC20BridgeSource.SushiSwap,
             SOURCE_TYPES.ERC20BridgeSource.QuickSwap,
+            SOURCE_TYPES.ERC20BridgeSource.BalancerV2,
             SOURCE_TYPES.ERC20BridgeSource.UniswapV3,
-            SOURCE_TYPES.ERC20BridgeSource.BalancerV2
+            SOURCE_TYPES.ERC20BridgeSource.MultiHop
         ]);
-        const chunkSize = 3;
+        const chunkSize = 2;
         const queryTokenChunks = _.chunk(buyTokens, chunkSize);
         let iterateBlocks: number[] = [ startBlock ];
         for (let step = 1; step <= stepCount; step++) {
@@ -235,14 +236,27 @@ export class SwapHandlers {
                                 "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
                                 [buyAmounts[i]]
                             )),
+                            ...tokens.map((t, i) => _sampler.getTwoHopBuyQuotes(
+                                buySources.sources,
+                                buyAddresses[i],
+                                "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+                                buyAmounts[i]
+                            )),
                         ];
                         const results = await _sampler.executeBatchAsync(ops, forceBlock);
-                        let quotes = results.map((q: any) => q.map((x: any) => x[0]));
+                        const singles = results.slice(0, tokens.length);
+                        const multis = results.slice(tokens.length);
+                        let quotes = tokens.map((t, i) => {
+                            return [... singles[i].flat(), ... multis[i]];
+                        });
                         quotes = quotes.map((q: any) => q.filter((x: QuoteData) => {
                             if (isUndefined(x) || isUndefined(x.output)) {
                                 return false;
                             } else {
-                                return x.output != "0";
+                                return (
+                                    x.output != "0" &&
+                                    x.output != "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+                                );
                             }
                         }));
                         quotes.forEach(async (q: QuoteData[], i: number) => {
