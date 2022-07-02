@@ -162,7 +162,7 @@ export class SwapHandlers {
         const startBlockRaw: number = req.body.startBlock;
         const stepSizeRaw: number = req.body.stepSize;
         const stepCountRaw: number = req.body.stepCount;
-        const precise: boolean = req.body.precise || false;
+        const precise: boolean = isUndefined(req.body.precise) ? false : req.body.precise;
         if (!buyTokens) {
             throw new ValidationError([
                 {
@@ -273,9 +273,9 @@ export class SwapHandlers {
                             if (isUndefined(x) || isUndefined(x.output)) {
                                 return false;
                             } else {
-                                return (
-                                    x.output != "0" &&
-                                    x.output != "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+                                return !(
+                                    x.output == "0" ||
+                                    x.output == "115792089237316195423570985008687907853269984665640564039457584007913129639935"
                                 );
                             }
                         }));
