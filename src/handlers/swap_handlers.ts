@@ -212,7 +212,7 @@ export class SwapHandlers {
             SOURCE_TYPES.ERC20BridgeSource.UniswapV3,
             SOURCE_TYPES.ERC20BridgeSource.MultiHop
         ]);
-        const chunkSize = 2;
+        const chunkSize = 1;
         const queryTokenChunks = _.chunk(buyTokens, chunkSize);
         let iterateBlocks: number[] = [ startBlock ];
         for (let step = 1; step <= stepCount; step++) {
