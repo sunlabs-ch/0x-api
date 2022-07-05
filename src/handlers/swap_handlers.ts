@@ -162,7 +162,7 @@ export class SwapHandlers {
         const startBlockRaw: number = req.body.startBlock;
         const stepSizeRaw: number = req.body.stepSize;
         const stepCountRaw: number = req.body.stepCount;
-        const precise: boolean = isUndefined(req.body.precise) ? false : req.body.precise;
+        const precise: boolean = req.body.precise || false;
         if (!buyTokens) {
             throw new ValidationError([
                 {
@@ -219,7 +219,7 @@ export class SwapHandlers {
                 SOURCE_TYPES.ERC20BridgeSource.QuickSwap,
                 SOURCE_TYPES.ERC20BridgeSource.UniswapV3
             ]);
-        const chunkSize = 1;
+        const chunkSize = 2;
         const queryTokenChunks = _.chunk(buyTokens, chunkSize);
         let iterateBlocks: number[] = [ startBlock ];
         for (let step = 1; step <= stepCount; step++) {
