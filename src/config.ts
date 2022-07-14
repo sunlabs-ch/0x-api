@@ -2,6 +2,7 @@
 import { assert } from '@0x/assert';
 import {
     BlockParamLiteral,
+    ChainId,
     DEFAULT_TOKEN_ADJACENCY_GRAPH_BY_CHAIN_ID,
     ERC20BridgeSource,
     LiquidityProviderRegistry,
@@ -13,11 +14,11 @@ import {
     SwapQuoterOpts,
     SwapQuoterRfqOpts,
 } from '@0x/asset-swapper';
-import { ChainId } from '@0x/contract-addresses';
 import { nativeWrappedTokenSymbol, TokenMetadatasForChains, valueByChainId } from '@0x/token-metadata';
 import { BigNumber } from '@0x/utils';
 import * as fs from 'fs';
 import * as _ from 'lodash';
+import { linearBuckets } from 'prom-client';
 import * as validateUUID from 'uuid-validate';
 
 import {
@@ -225,6 +226,9 @@ export const RPC_REQUEST_TIMEOUT = _.isEmpty(process.env.RPC_REQUEST_TIMEOUT)
     ? 5000
     : assertEnvVarType('RPC_REQUEST_TIMEOUT', process.env.RPC_REQUEST_TIMEOUT, EnvVarType.Integer);
 
+// Prometheus shared metrics
+export const PROMETHEUS_REQUEST_BUCKETS = linearBuckets(0, 0.25, RPC_REQUEST_TIMEOUT / 1000 / 0.25); // [ 0,  0.25,  0.5,  0.75, ... 5 ]
+
 // Enable client side content compression when sending RPC requests (default false)
 export const ENABLE_RPC_REQUEST_COMPRESSION = _.isEmpty(process.env.ENABLE_RPC_REQUEST_COMPRESSION)
     ? false
@@ -396,7 +400,9 @@ export const RFQM_MAINTENANCE_MODE: boolean = _.isEmpty(process.env.RFQM_MAINTEN
     : assertEnvVarType('RFQM_MAINTENANCE_MODE', process.env.RFQM_MAINTENANCE_MODE, EnvVarType.Boolean);
 
 // tslint:disable-next-line:boolean-naming
-export const RFQT_REQUEST_MAX_RESPONSE_MS = 600;
+export const RFQT_REQUEST_MAX_RESPONSE_MS: number = _.isEmpty(process.env.RFQT_REQUEST_MAX_RESPONSE_MS)
+    ? 600
+    : assertEnvVarType('RFQT_REQUEST_MAX_RESPONSE_MS', process.env.RFQT_REQUEST_MAX_RESPONSE_MS, EnvVarType.Integer);
 
 // Whitelisted 0x API keys that can post orders to the SRA and have them persist indefinitely
 export const SRA_PERSISTENT_ORDER_POSTING_WHITELISTED_API_KEYS: string[] =
@@ -503,14 +509,13 @@ const EXCLUDED_SOURCES = (() => {
     const allERC20BridgeSources = Object.values(ERC20BridgeSource);
     switch (CHAIN_ID) {
         case ChainId.Mainnet:
-            return [ERC20BridgeSource.MultiBridge, ERC20BridgeSource.Kyber];
+            return [ERC20BridgeSource.MultiBridge];
         case ChainId.Kovan:
             return allERC20BridgeSources.filter(
                 (s) => s !== ERC20BridgeSource.Native && s !== ERC20BridgeSource.UniswapV2,
             );
         case ChainId.Ropsten:
             const supportedRopstenSources = new Set([
-                ERC20BridgeSource.Kyber,
                 ERC20BridgeSource.Native,
                 ERC20BridgeSource.SushiSwap,
                 ERC20BridgeSource.Uniswap,
@@ -523,7 +528,7 @@ const EXCLUDED_SOURCES = (() => {
         case ChainId.BSC:
             return [ERC20BridgeSource.MultiBridge, ERC20BridgeSource.Native];
         case ChainId.Polygon:
-            return [ERC20BridgeSource.MultiBridge, ERC20BridgeSource.Native, ERC20BridgeSource.KyberDmm];
+            return [ERC20BridgeSource.MultiBridge, ERC20BridgeSource.Native];
         case ChainId.Avalanche:
             return [ERC20BridgeSource.MultiBridge, ERC20BridgeSource.Native];
         case ChainId.Celo:
@@ -576,9 +581,7 @@ const EXCHANGE_PROXY_OVERHEAD_FULLY_FEATURED = (sourceFlags: bigint) => {
             SOURCE_FLAGS.PancakeSwap_V2,
             SOURCE_FLAGS.BakerySwap,
             SOURCE_FLAGS.ApeSwap,
-            SOURCE_FLAGS.CafeSwap,
             SOURCE_FLAGS.CheeseSwap,
-            SOURCE_FLAGS.JulSwap,
         ].includes(sourceFlags) &&
         CHAIN_ID === ChainId.BSC
     ) {

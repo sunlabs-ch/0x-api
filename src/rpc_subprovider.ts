@@ -9,10 +9,10 @@ import JsonRpcError = require('json-rpc-error');
 import { Counter, Histogram, Summary } from 'prom-client';
 import { gzip } from 'zlib';
 import { retryableAxiosInstance as axios } from './utils/axios_utils';
-
-import { ONE_SECOND_MS, PROMETHEUS_REQUEST_BUCKETS } from './constants';
 import { AxiosResponse } from 'axios';
 import { isEmpty, isUndefined } from 'lodash';
+import { PROMETHEUS_REQUEST_BUCKETS } from './config';
+import { ONE_SECOND_MS } from './constants';
 
 const httpAgent = new http.Agent({ keepAlive: true });
 const httpsAgent = new https.Agent({ keepAlive: true });

@@ -29,17 +29,18 @@ import {
     MATCHA_INTEGRATOR_ID,
     NATIVE_WRAPPED_TOKEN_SYMBOL,
     PLP_API_KEY_WHITELIST,
+    PROMETHEUS_REQUEST_BUCKETS,
     RFQT_API_KEY_WHITELIST,
     RFQT_INTEGRATOR_IDS,
     RFQT_REGISTRY_PASSWORDS
 } from '../config';
 import {
     AFFILIATE_DATA_SELECTOR,
+    DEFAULT_ENABLE_SLIPPAGE_PROTECTION,
     DEFAULT_QUOTE_SLIPPAGE_PERCENTAGE,
     MARKET_DEPTH_DEFAULT_DISTRIBUTION,
     MARKET_DEPTH_MAX_SAMPLES,
     ONE_SECOND_MS,
-    PROMETHEUS_REQUEST_BUCKETS,
     SWAP_DOCS_URL,
 } from '../constants';
 import {
@@ -346,9 +347,12 @@ export class SwapHandlers {
             req.log.info({
                 firmQuoteServed: {
                     taker: params.takerAddress,
+                    affiliateAddress: params.affiliateAddress,
                     // TODO (MKR-123): remove once the log consumers have been updated
                     apiKey: params.integrator?.integratorId,
                     integratorId: params.integrator?.integratorId,
+                    integratorLabel: params.integrator?.label,
+                    origin: params.origin,
                     rawApiKey: params.apiKey,
                     buyToken: params.buyToken,
                     sellToken: params.sellToken,
@@ -411,7 +415,13 @@ export class SwapHandlers {
         );
         if (params.includePriceComparisons && quote.priceComparisonsReport) {
             const side = params.sellAmount ? MarketOperation.Sell : MarketOperation.Buy;
-            const priceComparisons = priceComparisonUtils.getPriceComparisonFromQuote(CHAIN_ID, side, quote);
+            const priceComparisons = priceComparisonUtils.getPriceComparisonFromQuote(
+                CHAIN_ID,
+                side,
+                quote,
+                this._swapService.slippageModelManager,
+                params.slippagePercentage || DEFAULT_QUOTE_SLIPPAGE_PERCENTAGE,
+            );
             response.priceComparisons = priceComparisons?.map((sc) => priceComparisonUtils.renameNative(sc));
         }
         const duration = (new Date().getTime() - begin) / ONE_SECOND_MS;
@@ -426,9 +436,12 @@ export class SwapHandlers {
         req.log.info({
             indicativeQuoteServed: {
                 taker: params.takerAddress,
+                affiliateAddress: params.affiliateAddress,
                 // TODO (MKR-123): remove once the log source is updated
                 apiKey: params.integrator?.integratorId,
                 integratorId: params.integrator?.integratorId,
+                integratorLabel: params.integrator?.label,
+                origin: params.origin,
                 rawApiKey: params.apiKey,
                 buyToken: params.buyToken,
                 sellToken: params.sellToken,
@@ -458,14 +471,18 @@ export class SwapHandlers {
             'sellTokenToEthRate',
             'buyTokenToEthRate',
             'expectedSlippage',
-            'expectedBuyAmount',
-            'expectedSellAmount',
         );
 
         if (params.includePriceComparisons && quote.priceComparisonsReport) {
             const marketSide = params.sellAmount ? MarketOperation.Sell : MarketOperation.Buy;
             response.priceComparisons = priceComparisonUtils
-                .getPriceComparisonFromQuote(CHAIN_ID, marketSide, quote)
+                .getPriceComparisonFromQuote(
+                    CHAIN_ID,
+                    marketSide,
+                    quote,
+                    this._swapService.slippageModelManager,
+                    params.slippagePercentage || DEFAULT_QUOTE_SLIPPAGE_PERCENTAGE,
+                )
                 ?.map((sc) => priceComparisonUtils.renameNative(sc));
         }
 
@@ -586,6 +603,7 @@ const parseSwapQuoteRequestParams = (req: express.Request, endpoint: 'price' | '
     // HACK typescript typing does not allow this valid json-schema
     schemaUtils.validateSchema(req.query, schemas.swapQuoteRequestSchema as any);
     const apiKey: string | undefined = req.header('0x-api-key');
+    const origin: string | undefined = req.header('origin');
     let integratorId: string | undefined;
     if (apiKey) {
         integratorId = getIntegratorIdForApiKey(apiKey);
@@ -710,18 +728,6 @@ const parseSwapQuoteRequestParams = (req: express.Request, endpoint: 'price' | '
         ]);
     }
 
-    // Log the request if it passes all validations
-    req.log.info({
-        type: 'swapRequest',
-        endpoint,
-        updatedExcludedSources,
-        nativeExclusivelyRFQT,
-        // TODO (MKR-123): Remove once the log source has been updated.
-        apiKey: integratorId || 'N/A',
-        integratorId: integratorId || 'N/A',
-        rawApiKey: apiKey || 'N/A',
-    });
-
     const rfqt: Pick<RfqRequestOpts, 'intentOnFilling' | 'isIndicative' | 'nativeExclusivelyRFQ'> | undefined = (() => {
         if (apiKey) {
             if (endpoint === 'quote' && takerAddress) {
@@ -744,32 +750,65 @@ const parseSwapQuoteRequestParams = (req: express.Request, endpoint: 'price' | '
     const affiliateFee = parseUtils.parseAffiliateFeeOptions(req);
     const integrator = integratorId ? getIntegratorByIdOrThrow(integratorId) : undefined;
 
-    return {
+    // tslint:disable:boolean-naming
+    const enableSlippageProtection = parseOptionalBooleanParam(
+        req.query.enableSlippageProtection as string,
+        DEFAULT_ENABLE_SLIPPAGE_PROTECTION,
+    );
+
+    // Log the request if it passes all validations
+    req.log.info({
+        type: 'swapRequest',
         endpoint,
-        takerAddress: takerAddress as string,
-        sellToken,
-        buyToken,
-        sellAmount,
-        buyAmount,
-        slippagePercentage,
-        gasPrice,
-        excludedSources: updatedExcludedSources,
-        includedSources,
+        updatedExcludedSources,
+        nativeExclusivelyRFQT,
+        // TODO (MKR-123): Remove once the log source has been updated.
+        apiKey: integratorId || 'N/A',
+        integratorId: integratorId || 'N/A',
+        integratorLabel: integrator?.label || 'N/A',
+        rawApiKey: apiKey || 'N/A',
+        enableSlippageProtection,
+    });
+
+    return {
         affiliateAddress: affiliateAddress as string,
-        rfqt,
-        skipValidation,
-        apiKey,
-        integrator,
         affiliateFee,
+        apiKey,
+        buyAmount,
+        buyToken,
+        endpoint,
+        excludedSources: updatedExcludedSources,
+        gasPrice,
         includePriceComparisons,
-        shouldSellEntireBalance,
-        isMetaTransaction: false,
-        isETHSell: isNativeSell,
+        includedSources,
+        integrator,
         isETHBuy: isNativeBuy,
+        isETHSell: isNativeSell,
+        isMetaTransaction: false,
         isUnwrap,
         isWrap,
+        origin,
+        rfqt,
+        sellAmount,
+        sellToken,
+        shouldSellEntireBalance,
+        skipValidation,
+        slippagePercentage,
+        takerAddress: takerAddress as string,
+        enableSlippageProtection,
     };
 };
+
+/**
+ * If undefined, use the default value, else parse the value as a boolean.
+ */
+
+function parseOptionalBooleanParam(param: string | undefined, defaultValue: boolean): boolean {
+    if (param === undefined || param === '') {
+        return defaultValue;
+    }
+    return param === 'true';
+}
 
 /*
  * Extract the quote ID from the quote filldata

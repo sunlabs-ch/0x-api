@@ -1,7 +1,10 @@
+import { ERC20BridgeSource, NATIVE_FEE_TOKEN_BY_CHAIN_ID } from '@0x/asset-swapper';
+import { isNativeSymbolOrAddress } from '@0x/token-metadata';
 import { BigNumber } from '@0x/utils';
 import { Counter } from 'prom-client';
 
 import {
+    CHAIN_ID,
     SLIPPAGE_MODEL_REFRESH_INTERVAL_MS,
     SLIPPAGE_MODEL_S3_BUCKET_NAME,
     SLIPPAGE_MODEL_S3_FILE_NAME,
@@ -22,7 +25,7 @@ const SLIPPAGE_MODEL_FILE_STALE = new Counter({
     labelNames: ['bucket', 'fileName'],
 });
 
-interface SlippageModel {
+export interface SlippageModel {
     token0: string;
     token1: string;
     source: string;
@@ -74,16 +77,30 @@ const createSlippageModelCache = (slippageModelFileContent: string, logLabels: {
 };
 
 /**
+ * If the token is represented as 0xeeee.. than convert to the wrapped token
+ * representation (e.g WETH)
+ */
+const normalizeTokenAddress = (token: string): string => {
+    const isNativeAsset = isNativeSymbolOrAddress(token, CHAIN_ID);
+    return isNativeAsset ? NATIVE_FEE_TOKEN_BY_CHAIN_ID[CHAIN_ID].toLowerCase() : token.toLowerCase();
+};
+
+/**
  * Calculate `expectedSlippage` of an order based on slippage model
  */
 const calculateExpectedSlippageForModel = (
     token0Amount: BigNumber,
-    maxSlippageInBps: BigNumber,
+    maxSlippageRate: BigNumber,
     slippageModel: SlippageModel,
-): BigNumber => {
-    const slippageTerm = maxSlippageInBps.times(slippageModel.slippageCoefficient);
-    const volumeTerm = token0Amount.times(slippageModel.token0PriceInUsd).times(slippageModel.volumeCoefficient);
-    return slippageTerm.plus(volumeTerm).plus(slippageModel.intercept);
+): BigNumber | null => {
+    const volumeUsd = token0Amount.times(slippageModel.token0PriceInUsd);
+    const volumeTerm = volumeUsd.times(slippageModel.volumeCoefficient);
+    const slippageTerm = maxSlippageRate.times(ONE_IN_BASE_POINTS).times(slippageModel.slippageCoefficient);
+    const expectedSlippage = BigNumber.sum(slippageTerm, volumeTerm, slippageModel.intercept);
+    const expectedSlippageCap = maxSlippageRate.times(-1); // `maxSlippageRate` is specified with a positive number while `expectedSlippage` is normally negative.
+
+    // Return 0 if the expected slippage is positive since the model shouldn't predict a positive slippage.
+    return BigNumber.min(new BigNumber(0), BigNumber.max(expectedSlippage, expectedSlippageCap));
 };
 
 /**
@@ -120,44 +137,74 @@ export class SlippageModelManager {
         sellToken: string,
         buyAmount: BigNumber,
         sellAmount: BigNumber,
-        maxSlippageRate: number,
         sources: GetSwapQuoteResponseLiquiditySource[],
-    ): BigNumber {
-        const maxSlippageInBps = new BigNumber(maxSlippageRate * ONE_IN_BASE_POINTS);
-        let expectedSlippage: BigNumber = new BigNumber(0);
-        sources.forEach((source) => {
-            if (source.proportion.isGreaterThan(0)) {
-                const slippageModel = this._getCachedModel(buyToken, sellToken, source.name);
-                if (slippageModel !== undefined) {
-                    const token0Amount = source.proportion.times(
-                        slippageModel.token0 === buyToken.toLowerCase() ? buyAmount : sellAmount,
-                    );
-
-                    const expectedSlippageOfSource = calculateExpectedSlippageForModel(
-                        token0Amount,
-                        maxSlippageInBps,
-                        slippageModel,
-                    );
-                    expectedSlippage = expectedSlippage.plus(source.proportion.times(expectedSlippageOfSource));
-                }
+        maxSlippageRate: number,
+    ): BigNumber | null {
+        const normalizedBuyToken = normalizeTokenAddress(buyToken);
+        const normalizedSellToken = normalizeTokenAddress(sellToken);
+        let expectedSlippage = new BigNumber(0);
+        for (const source of sources) {
+            if (source.proportion.isEqualTo(0)) {
+                continue;
             }
-        });
+
+            const singleSourceSlippage = this._calculateSingleSourceExpectedSlippage(
+                normalizedBuyToken,
+                normalizedSellToken,
+                buyAmount,
+                sellAmount,
+                source,
+                maxSlippageRate,
+            );
+
+            if (singleSourceSlippage === null) {
+                return null;
+            }
+            expectedSlippage = expectedSlippage.plus(singleSourceSlippage);
+        }
         return expectedSlippage;
     }
 
-    /**
-     * Get the cached slippage model data for a specific pair and source
-     * @param tokenA Address of one token
-     * @param tokenB Address of another token
-     * @param source Name of AMM source
-     * @returns Slippage model
-     */
-    private _getCachedModel(tokenA: string, tokenB: string, sourceName: string): SlippageModel | undefined {
-        const pairKey = pairUtils.toKey(tokenA, tokenB);
-        if (this._cachedSlippageModel.has(pairKey)) {
-            return this._cachedSlippageModel.get(pairKey)!.get(sourceName);
+    private _calculateSingleSourceExpectedSlippage(
+        buyToken: string,
+        sellToken: string,
+        buyAmount: BigNumber,
+        sellAmount: BigNumber,
+        source: GetSwapQuoteResponseLiquiditySource,
+        maxSlippageRate: number,
+    ): BigNumber | null {
+        // For 0x native source, the source name should be '0x' instead of 'Native', but check both to be future proof.
+        if (source.name === '0x' || source.name === ERC20BridgeSource.Native) {
+            return new BigNumber(0);
         }
-        return undefined;
+
+        const slippageModelCacheForPair = this._cachedSlippageModel.get(pairUtils.toKey(buyToken, sellToken));
+        // Slippage models for given pair is not available
+        if (slippageModelCacheForPair === undefined) {
+            return null;
+        }
+
+        const slippageModel = slippageModelCacheForPair.get(source.name);
+        if (slippageModel === undefined) {
+            return null;
+        }
+
+        const token0Amount = source.proportion.times(
+            slippageModel.token0 === buyToken.toLowerCase() ? buyAmount : sellAmount,
+        );
+
+        const expectedSlippageOfSource = calculateExpectedSlippageForModel(
+            token0Amount,
+            new BigNumber(maxSlippageRate),
+            slippageModel,
+        );
+
+        // Volume for given source is too small for a reasonable prediction
+        if (expectedSlippageOfSource === null) {
+            return null;
+        }
+
+        return source.proportion.times(expectedSlippageOfSource);
     }
 
     /**
