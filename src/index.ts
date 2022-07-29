@@ -22,7 +22,7 @@ if (cluster.isMaster) {
     ethRpcUrl = process.env["ETHEREUM_RPC_URL"] as string;
 }
 
-const clusterWorkerSize = Math.min(os.cpus().length, rpcArr.length);
+const clusterWorkerSize = Math.min(os.cpus().length * 2, rpcArr.length);
 
 
 if (require.main === module) {

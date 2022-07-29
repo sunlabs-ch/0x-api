@@ -34,4 +34,4 @@ export const retryableAxios = (config: AxiosRequestConfig): AxiosPromise => {
 // Attach retry-axios only to our specific instance
 rax.attach(retryableAxiosInstance);
 
-axiosThrottle.use(retryableAxiosInstance, { requestsPerSecond: 120 });
+axiosThrottle.use(retryableAxiosInstance, { requestsPerSecond: 30 });
