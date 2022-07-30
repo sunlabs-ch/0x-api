@@ -3,4 +3,4 @@ import axiosThrottle from "axios-request-throttle";
 
 export const axios = Axios.create();
 
-axiosThrottle.use(axios, { requestsPerSecond: 30 });
+axiosThrottle.use(axios, { requestsPerSecond: 10 });
