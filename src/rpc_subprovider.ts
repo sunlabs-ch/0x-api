@@ -8,7 +8,7 @@ import JsonRpcError = require('json-rpc-error');
 //import fetch, { Headers, Response } from 'node-fetch';
 import { Counter, Histogram, Summary } from 'prom-client';
 import { gzip } from 'zlib';
-import { retryableAxiosInstance as axios } from './utils/axios_utils';
+import { axios } from './utils/axios_utils';
 import { AxiosResponse } from 'axios';
 import { isEmpty, isUndefined } from 'lodash';
 import { PROMETHEUS_REQUEST_BUCKETS } from './config';
