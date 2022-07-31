@@ -151,22 +151,7 @@ export class RPCSubprovider extends Subprovider {
                     return;
             }
         }
-/*
-        let data;
-        try {
-            data = JSON.parse(text);
-        } catch (err) {
-            ETH_RPC_REQUEST_ERROR.labels(finalPayload.method!).inc();
-            end(new JsonRpcError.InternalError(err));
-            return;
-        }
-
-        if (data.error) {
-            ETH_RPC_REQUEST_ERROR.labels(finalPayload.method!).inc();
-            end(data.error);
-            return;
-        }
-*/
+        
         ETH_RPC_REQUEST_SUCCESS.labels(finalPayload.method!).inc();
         if (isEmpty(text.result) || isUndefined(text.result)) {
             console.log(finalPayload);
