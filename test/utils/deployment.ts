@@ -2,9 +2,6 @@ import { logUtils as log } from '@0x/utils';
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as redis from 'redis';
-
-import { REDIS_URI } from '../../src/config';
 
 import { initDBConnectionAsync } from './db_connection';
 
@@ -52,9 +49,8 @@ export async function setupDependenciesAsync(suiteName: string, logType?: LogTyp
 
     // Wait for the dependencies to boot up.
     await waitForDependencyStartupAsync(up);
-    await sleepAsync(10); // tslint:disable-line:custom-no-magic-numbers
+    await sleepAsync(10);
     await confirmPostgresConnectivityAsync();
-    await confirmRedisConnectivityAsync();
 }
 
 /**
@@ -133,7 +129,7 @@ async function waitForDependencyStartupAsync(logStream: ChildProcessWithoutNullS
         });
         setTimeout(() => {
             reject(new Error('Timed out waiting for dependency logs'));
-        }, 60000); // tslint:disable-line:custom-no-magic-numbers
+        }, 60000);
     });
 }
 
@@ -141,7 +137,7 @@ async function confirmPostgresConnectivityAsync(maxTries: number = 5): Promise<v
     try {
         await Promise.all([
             // delay before retrying
-            new Promise<void>((resolve) => setTimeout(resolve, 2000)), // tslint:disable-line:custom-no-magic-numbers
+            new Promise<void>((resolve) => setTimeout(resolve, 2000)),
             async () => {
                 await initDBConnectionAsync();
             },
@@ -155,33 +151,6 @@ async function confirmPostgresConnectivityAsync(maxTries: number = 5): Promise<v
         }
     }
 }
-async function confirmRedisConnectivityAsync(maxTries: number = 5): Promise<void> {
-    try {
-        await Promise.all([
-            // delay before retrying
-            new Promise<void>((resolve) => setTimeout(resolve, 2000)), // tslint:disable-line:custom-no-magic-numbers
-            async () => {
-                const redisClient = redis.createClient({ url: REDIS_URI });
-                return new Promise((resolve, reject) => {
-                    redisClient.ping((err, reply) => {
-                        if (err) {
-                            reject(err);
-                        }
-                        resolve(reply);
-                    });
-                });
-            },
-        ]);
-        return;
-    } catch (e) {
-        if (maxTries > 0) {
-            await confirmRedisConnectivityAsync(maxTries - 1);
-        } else {
-            throw e;
-        }
-    }
-}
-
 async function sleepAsync(timeSeconds: number): Promise<void> {
     return new Promise<void>((resolve) => {
         const secondsPerMillisecond = 1000;
