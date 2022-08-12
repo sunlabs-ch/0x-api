@@ -27,7 +27,7 @@ RUN apk update && \
     apk upgrade && \
     apk add ca-certificates libc6-compat && \
     ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2 && \
-    apk add postgresql14 postgresql14-contrib redis sudo expect
+    apk add postgresql14 postgresql14-contrib sudo expect
 
 RUN mkdir -p /var/run/postgresql && \
 	chown -R postgres:postgres /var/run/postgresql && \

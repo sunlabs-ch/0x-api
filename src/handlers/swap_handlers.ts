@@ -153,15 +153,48 @@ export class SwapHandlers {
         this._swapService = swapService;
     }
 
+    private readonly HARDCODED_SOURCES: any = {
+        '137': {
+            'true': new SOURCE_FILTERS.SourceFilters([
+                SOURCE_TYPES.ERC20BridgeSource.SushiSwap,
+                SOURCE_TYPES.ERC20BridgeSource.QuickSwap,
+                SOURCE_TYPES.ERC20BridgeSource.BalancerV2,
+                SOURCE_TYPES.ERC20BridgeSource.UniswapV3,
+                SOURCE_TYPES.ERC20BridgeSource.MultiHop
+            ]),
+            'false': new SOURCE_FILTERS.SourceFilters([
+                SOURCE_TYPES.ERC20BridgeSource.SushiSwap,
+                SOURCE_TYPES.ERC20BridgeSource.QuickSwap,
+                SOURCE_TYPES.ERC20BridgeSource.UniswapV3
+            ])
+        },
+        '1': {
+            'true': new SOURCE_FILTERS.SourceFilters([
+                SOURCE_TYPES.ERC20BridgeSource.SushiSwap,
+                SOURCE_TYPES.ERC20BridgeSource.BalancerV2,
+                SOURCE_TYPES.ERC20BridgeSource.UniswapV2,
+                SOURCE_TYPES.ERC20BridgeSource.UniswapV3,
+                SOURCE_TYPES.ERC20BridgeSource.MultiHop
+            ]),
+            'false': new SOURCE_FILTERS.SourceFilters([
+                SOURCE_TYPES.ERC20BridgeSource.SushiSwap,
+                SOURCE_TYPES.ERC20BridgeSource.UniswapV2,
+                SOURCE_TYPES.ERC20BridgeSource.UniswapV3
+            ])
+        }
+    };
+
+    private readonly HARDCODED_USDC: any = {
+        '137': "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+        '1': "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+    };
+
     public async getTokensHistory(req: express.Request, res: express.Response): Promise<void> {
         const buyTokens: TokenMetadata[] = req.body.buyTokens;
         const startBlockRaw: number = req.body.startBlock;
         const stepSizeRaw: number = req.body.stepSize;
         const stepCountRaw: number = req.body.stepCount;
-        const precise: boolean = req.body.precise || false;
-        if (precise) {
-            console.log("Precision engaged.");
-        }
+        const precise: boolean = req.body.precision || false;
         if (!buyTokens) {
             throw new ValidationError([
                 {
@@ -205,19 +238,7 @@ export class SwapHandlers {
         if (startBlock == currentBlock) {
             args_count--;
         }
-        const buySources = precise ?
-            new SOURCE_FILTERS.SourceFilters([
-                SOURCE_TYPES.ERC20BridgeSource.SushiSwap,
-                SOURCE_TYPES.ERC20BridgeSource.QuickSwap,
-                SOURCE_TYPES.ERC20BridgeSource.BalancerV2,
-                SOURCE_TYPES.ERC20BridgeSource.UniswapV3,
-                SOURCE_TYPES.ERC20BridgeSource.MultiHop
-            ]) :
-            new SOURCE_FILTERS.SourceFilters([
-                SOURCE_TYPES.ERC20BridgeSource.SushiSwap,
-                SOURCE_TYPES.ERC20BridgeSource.QuickSwap,
-                SOURCE_TYPES.ERC20BridgeSource.UniswapV3
-            ]);
+        const buySources = this.HARDCODED_SOURCES[CHAIN_ID][precise ? "true" : "false"];
         const chunkSize = 1; //precise ? 1 : 2;
         const queryTokenChunks = _.chunk(buyTokens, chunkSize);
         let iterateBlocks: number[] = [ startBlock ];
@@ -239,13 +260,13 @@ export class SwapHandlers {
                             ...tokens.map((t, i) => _sampler.getBuyQuotes(
                                 buySources.sources,
                                 buyAddresses[i],
-                                "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+                                this.HARDCODED_USDC[CHAIN_ID],
                                 [buyAmounts[i]]
                             )),
                             ...tokens.map((t, i) => _sampler.getTwoHopBuyQuotes(
                                 buySources.sources,
                                 buyAddresses[i],
-                                "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+                                this.HARDCODED_USDC[CHAIN_ID],
                                 buyAmounts[i]
                             )),
                         ] :
@@ -253,7 +274,7 @@ export class SwapHandlers {
                             ...tokens.map((t, i) => _sampler.getBuyQuotes(
                                 buySources.sources,
                                 buyAddresses[i],
-                                "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+                                this.HARDCODED_USDC[CHAIN_ID],
                                 [buyAmounts[i]]
                             )),
                         ];
