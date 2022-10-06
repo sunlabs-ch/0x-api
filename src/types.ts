@@ -1,8 +1,10 @@
 import { HttpServiceConfig as BaseHttpConfig } from '@0x/api-utils';
+import { ExchangeProxyMetaTransaction, ZeroExTransaction } from '@0x/types';
+import { BigNumber } from '@0x/utils';
+
 import {
     AffiliateFeeType,
     ChainId,
-    ContractAddresses,
     ERC20BridgeSource,
     ExtendedQuoteReportSources,
     LimitOrderFields,
@@ -10,28 +12,8 @@ import {
     QuoteReport,
     RfqRequestOpts,
     Signature,
-    SupportedProvider,
-} from '@0x/asset-swapper';
-import { ExchangeProxyMetaTransaction, ZeroExTransaction } from '@0x/types';
-import { BigNumber } from '@0x/utils';
-
+} from './asset-swapper';
 import { Integrator } from './config';
-import { MetaTransactionRateLimiter } from './utils/rate-limiters';
-import { MetaTransactionRateLimitConfig } from './utils/rate-limiters/types';
-
-export {
-    AvailableRateLimiter,
-    DatabaseKeysUsedForRateLimiter,
-    MetaTransactionDailyLimiterConfig,
-    MetaTransactionRateLimitConfig,
-    MetaTransactionRateLimiterAllowedResponse,
-    MetaTransactionRateLimiterContext,
-    MetaTransactionRateLimiterRejectedResponse,
-    MetaTransactionRateLimiterResponse,
-    MetaTransactionRollingLimiterConfig,
-    MetaTransactionRollingValueLimiterConfig,
-    RollingLimiterIntervalUnit,
-} from './utils/rate-limiters/types';
 
 export enum OrderWatcherLifeCycleEvents {
     Added,
@@ -180,12 +162,10 @@ export interface TokenMetadata {
     tokenAddress: string;
 }
 
-// tslint:disable:enum-naming
 export enum FeeParamTypes {
     POSITIVE_SLIPPAGE = 'POSITIVE_SLIPPAGE',
     FIXED = 'FIXED',
 }
-// tslint:enable:enum-naming
 
 export interface AffiliateFeeAmounts {
     gasCost: BigNumber;
@@ -195,7 +175,7 @@ export interface AffiliateFeeAmounts {
 
 /** Begin /swap and /meta_transaction types */
 
-interface QuoteBase {
+export interface QuoteBase {
     chainId: ChainId;
     price: BigNumber;
     buyAmount: BigNumber;
@@ -301,7 +281,7 @@ export interface GetSwapQuoteParams extends SwapQuoteParamsBase {
 }
 
 // GET /swap/price
-export interface GetSwapPriceResponse extends BasePriceResponse {}
+export type GetSwapPriceResponse = BasePriceResponse;
 
 // GET /swap/prices
 export interface Price {
@@ -309,121 +289,57 @@ export interface Price {
     price: BigNumber;
 }
 
-// GET /meta_transaction/quote
-export interface GetMetaTransactionQuoteResponse extends BasePriceResponse {
-    mtxHash: string;
-    mtx: ExchangeProxyMetaTransaction;
-    // orders: SignedOrder[]
+/**
+ * Response type for /meta_transaction/v1/quote endpoint
+ */
+export interface MetaTransactionQuoteResponse extends BasePriceResponse {
+    metaTransactionHash: string;
+    metaTransaction: ExchangeProxyMetaTransaction;
     orders?: any;
 }
 
-// GET /meta_transaction/price
-export interface GetMetaTransactionPriceResponse extends BasePriceResponse {}
-
-// GET /meta_transaction/status/:txhash
-export interface GetMetaTransactionStatusResponse {
-    refHash: string;
-    hash?: string;
-    status: string;
-    gasPrice?: BigNumber;
-    updatedAt?: Date;
-    blockNumber?: number;
-    expectedMinedInSec?: number;
-    ethereumTxStatus?: number;
-}
+/**
+ * Response type for the /meta_transaction/v1/price endpoint
+ */
+export type MetaTransactionPriceResponse = BasePriceResponse;
 
 // Request params
-export interface GetTransactionRequestParams extends SwapQuoteParamsBase {
-    takerAddress: string;
-    sellTokenAddress: string;
-    buyTokenAddress: string;
-}
 
-// POST /meta_transaction/submit
-export interface PostTransactionResponse {
-    txHash: string;
-    mtxHash: string;
+/**
+ * Request type for /meta_transaction/v1/price and /meta_transaction/v1/quote.
+ * Reflected in `meta_transaction_quote_request_schema.json`.
+ */
+export interface MetaTransactionQuoteRequestParams extends SwapQuoteParamsBase {
+    buyTokenAddress: string;
+    integratorId: string;
+    quoteUniqueId?: string; // ID to use for the quote report `decodedUniqueId`
+    sellTokenAddress: string;
+    takerAddress: string;
 }
 
 // Interim types
 export type ZeroExTransactionWithoutDomain = Omit<ZeroExTransaction, 'domain'>;
 
-export type ExchangeProxyMetaTransactionWithoutDomain = Omit<ExchangeProxyMetaTransaction, 'domain'>;
-
-export interface CalculateMetaTransactionQuoteResponse extends QuoteBase {
-    sellTokenAddress: string;
+/**
+ * Parameters for the Meta Transaction Service price and quote functions.
+ */
+export interface MetaTransactionQuoteParams extends SwapQuoteParamsBase {
     buyTokenAddress: string;
-    taker: string;
-    quoteReport?: QuoteReport;
-    // orders: SignedOrder[];
-    callData: string;
-}
-
-export interface CalculateMetaTransactionQuoteParams extends SwapQuoteParamsBase {
-    sellTokenAddress: string;
-    buyTokenAddress: string;
-    takerAddress: string;
     from: string;
-    apiKey?: string;
+    integratorId: string;
     isETHBuy: boolean;
     isETHSell: boolean;
+    quoteUniqueId?: string; // ID to use for the quote report `decodedUniqueId`
+    sellTokenAddress: string;
+    takerAddress: string;
 }
 
 /** End /swap types */
-
-export enum TransactionStates {
-    // transaction has been constructed, but not yet submitted to the network.
-    Unsubmitted = 'unsubmitted',
-    // transaction has been submitted to the network.
-    Submitted = 'submitted',
-    // transaction has been spotted in the mempool.
-    Mempool = 'mempool',
-    // transaction has not been mined in the expected time.
-    Stuck = 'stuck',
-    // transaction has been mined.
-    Included = 'included',
-    // transaction is confirmed.
-    Confirmed = 'confirmed',
-    // transaction is no longer in the mempool.
-    Dropped = 'dropped',
-    // transaction has been aborted because a new transaction with the same
-    // nonce has been mined.
-    Aborted = 'aborted',
-    // transaction was in an unsubmitted state for too long.
-    Cancelled = 'cancelled',
-}
-
-export interface TransactionWatcherSignerStatus {
-    live: boolean;
-    timeSinceEpoch: number;
-    gasPrice: number;
-    maxGasPrice: number;
-    balances: {
-        [address: string]: number;
-    };
-}
-
-export interface TransactionWatcherSignerServiceConfig {
-    provider: SupportedProvider;
-    chainId: number;
-    contractAddresses: ContractAddresses;
-    signerPrivateKeys: string[];
-    expectedMinedInSec: number;
-    isSigningEnabled: boolean;
-    maxGasPriceGwei: BigNumber;
-    minSignerEthBalance: number;
-    transactionPollingIntervalMs: number;
-    heartbeatIntervalMs: number;
-    unstickGasMultiplier: number;
-    numBlocksUntilConfirmed: number;
-    rateLimiter?: MetaTransactionRateLimiter;
-}
 
 export interface HttpServiceConfig extends BaseHttpConfig {
     ethereumRpcUrl: string;
     kafkaBrokers?: string[];
     kafkaConsumerGroupId?: string;
-    metaTxnRateLimiters?: MetaTransactionRateLimitConfig;
     rpcRequestTimeout: number;
     shouldCompressRequest: boolean;
 }

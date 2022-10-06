@@ -1,14 +1,4 @@
-// tslint:disable:max-file-line-count
-import {
-    ContractAddresses,
-    ERC20BridgeSource,
-    MockedRfqQuoteResponse,
-    RfqOrder,
-    RfqOrderFields,
-    rfqtMocker,
-    RfqtQuoteEndpoint,
-    Signature,
-} from '@0x/asset-swapper';
+/* eslint @typescript-eslint/no-explicit-any: 0 */
 import { WETH9Contract } from '@0x/contract-wrappers';
 import { DummyERC20TokenContract } from '@0x/contracts-erc20';
 import { expect } from '@0x/contracts-test-utils';
@@ -25,7 +15,17 @@ import * as request from 'supertest';
 
 import { AppDependencies, getAppAsync, getDefaultAppDependenciesAsync } from '../src/app';
 import {
-    defaultHttpServiceWithRateLimiterConfig,
+    ContractAddresses,
+    ERC20BridgeSource,
+    MockedRfqQuoteResponse,
+    RfqOrder,
+    RfqOrderFields,
+    rfqtMocker,
+    RfqtQuoteEndpoint,
+    Signature,
+} from '../src/asset-swapper';
+import {
+    defaultHttpServiceConfig,
     PROTOCOL_FEE_MULTIPLIER,
     RFQT_PROTOCOL_FEE_GAS_PRICE_MAX_PADDING_MULTIPLIER,
 } from '../src/config';
@@ -83,12 +83,12 @@ describe.skip(SUITE_NAME, () => {
 
         // start the 0x-api app
         dependencies = await getDefaultAppDependenciesAsync(provider, {
-            ...defaultHttpServiceWithRateLimiterConfig,
+            ...defaultHttpServiceConfig,
             ethereumRpcUrl: ETHEREUM_RPC_URL,
         });
         ({ app, server } = await getAppAsync(
             { ...dependencies },
-            { ...defaultHttpServiceWithRateLimiterConfig, ethereumRpcUrl: ETHEREUM_RPC_URL },
+            { ...defaultHttpServiceConfig, ethereumRpcUrl: ETHEREUM_RPC_URL },
         ));
     });
 
@@ -427,6 +427,7 @@ describe.skip(SUITE_NAME, () => {
                         ...DEFAULT_RFQT_RESPONSE_DATA,
                         responseData: rfqtIndicativeQuoteResponse,
                     };
+                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                     mock.requestParams!.txOrigin = NULL_ADDRESS;
                     return rfqtMocker.withMockedRfqtQuotes(
                         [mock as any],
@@ -454,6 +455,7 @@ describe.skip(SUITE_NAME, () => {
                         responseData: {},
                         responseCode: 500,
                     };
+                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                     mock.requestParams!.txOrigin = NULL_ADDRESS;
                     return rfqtMocker.withMockedRfqtQuotes(
                         [mock as any],

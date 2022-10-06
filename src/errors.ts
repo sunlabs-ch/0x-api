@@ -19,7 +19,6 @@ export {
     ValidationErrorItem,
 } from '@0x/api-utils';
 
-// tslint:disable:max-classes-per-file
 export class InsufficientFundsError extends BadRequestError<APIErrorCodes> {
     public statusCode = HttpStatus.BAD_REQUEST;
     public generalErrorCode = APIErrorCodes.InsufficientFundsError;
@@ -64,6 +63,7 @@ export enum ValidationErrorReasons {
     UnfillableRequiresMakerAddress = 'MAKER_ADDRESS_REQUIRED_TO_FETCH_UNFILLABLE_ORDERS',
     MultipleFeeTypesUsed = 'MULTIPLE_FEE_TYPES_USED',
     FeeRecipientMissing = 'FEE_RECIPIENT_MISSING',
+    MinSlippageTooLow = 'MINIMUM_SLIPPAGE_IS_TOO_LOW',
 }
 
 export class ExpiredOrderError extends AlertError {

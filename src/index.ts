@@ -1,5 +1,5 @@
 import { getAppAsync, getDefaultAppDependenciesAsync } from './app';
-import { defaultHttpServiceWithRateLimiterConfig } from './config';
+import { defaultHttpServiceConfig } from './config';
 import { logger } from './logger';
 import { providerUtils } from './utils/provider_utils';
 const os = require("os");
@@ -28,12 +28,12 @@ const clusterWorkerSize = Math.min(os.cpus().length * 2, rpcArr.length);
 if (require.main === module) {
     const mainLoop = async () => {
         const provider = providerUtils.createWeb3Provider(
-            ethRpcUrl,
-            defaultHttpServiceWithRateLimiterConfig.rpcRequestTimeout,
-            defaultHttpServiceWithRateLimiterConfig.shouldCompressRequest,
+            defaultHttpServiceConfig.ethereumRpcUrl,
+            defaultHttpServiceConfig.rpcRequestTimeout,
+            defaultHttpServiceConfig.shouldCompressRequest,
         );
-        const dependencies = await getDefaultAppDependenciesAsync(provider, defaultHttpServiceWithRateLimiterConfig);
-        await getAppAsync(dependencies, defaultHttpServiceWithRateLimiterConfig);
+        const dependencies = await getDefaultAppDependenciesAsync(provider, defaultHttpServiceConfig);
+        await getAppAsync(dependencies, defaultHttpServiceConfig);
     };
 
     if (clusterWorkerSize > 1) {

@@ -1,6 +1,8 @@
 import { intervalUtils } from '@0x/utils';
 import * as _ from 'lodash';
 
+import { TX_BASE_GAS } from '../constants';
+
 export interface JsonRpcResponse {
     error: any;
     id: number;
@@ -41,7 +43,7 @@ export const utils = {
         const itemsClone = items.slice(0);
         const chunkedItems: T[][] = [];
         let currChunk: T[] = [];
-        let currentChunkTotalLength: number = 0;
+        let currentChunkTotalLength = 0;
         while (itemsClone.length !== 0) {
             const item = itemsClone[0];
             const currLength = Buffer.from(JSON.stringify(item)).byteLength;
@@ -63,12 +65,10 @@ export const utils = {
         return chunkedItems;
     },
     delayAsync: async (ms: number): Promise<void> => {
-        // tslint:disable-next-line:no-inferred-empty-object-type
         return new Promise<void>((resolve) => setTimeout(resolve, ms));
     },
     runWithTimeout: async <T>(fn: () => Promise<T>, timeoutMs: number): Promise<any> => {
         let _timeoutHandle: NodeJS.Timeout;
-        // tslint:disable-next-line:no-inferred-empty-object-type
         const timeoutPromise = new Promise((_resolve, reject) => {
             _timeoutHandle = setTimeout(() => reject(new Error('timeout')), timeoutMs);
         });
@@ -99,10 +99,9 @@ export const utils = {
     },
     calculateCallDataGas: (bytes: string) => {
         const buf = Buffer.from(bytes.replace(/0x/g, ''), 'hex');
-        let gas = 21000;
+        let gas = TX_BASE_GAS.toNumber();
         for (const b of buf) {
             // 4 gas per 0 byte, 16 gas per non-zero
-            // tslint:disable-next-line
             gas += b === 0 ? 4 : 16;
         }
         return gas;
