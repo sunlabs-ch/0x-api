@@ -13,6 +13,7 @@ import { AxiosResponse } from 'axios';
 import { isEmpty, isUndefined } from 'lodash';
 import { PROMETHEUS_REQUEST_BUCKETS } from './config';
 import { ONE_SECOND_MS } from './constants';
+import { createHash } from 'crypto';
 
 const httpAgent = new http.Agent({ keepAlive: true });
 const httpsAgent = new https.Agent({ keepAlive: true });
@@ -81,13 +82,21 @@ export class RPCSubprovider extends Subprovider {
     // tslint:disable-next-line:prefer-function-over-method async-suffix
     public async handleRequest(payload: JSONRPCRequestPayload, _next: Callback, end: ErrorCallback): Promise<void> {
         const finalPayload = Subprovider._createFinalPayload(payload);
-        const headers = new Headers({
-            Accept: 'application/json',
+        const cachingHeaders: any = {};
+        finalPayload.id = 0;
+        if (finalPayload?.params && finalPayload.params[1] !== 'latest') {
+            cachingHeaders['X-Hash'] = createHash('sha512')
+                .update(finalPayload.params[1] + ' ' + finalPayload.params[0].data)
+                .digest('base64');
+        }
+        const headers = {
+            'Accept': 'application/json',
             'Accept-Encoding': 'gzip, deflate',
-            Connection: 'keep-alive',
+            'Connection': 'keep-alive',
             'Content-Type': 'application/json',
             ...(this._shouldCompressRequest ? { 'Content-Encoding': 'gzip' } : {}),
-        });
+            ... cachingHeaders,
+        };
 
         ETH_RPC_REQUESTS.labels(finalPayload.method!).inc();
         const begin = Date.now();
@@ -112,7 +121,7 @@ export class RPCSubprovider extends Subprovider {
         for (let i = 0; i < 5; i++) {
             try {
                 response = await retryable();
-                if (!isUndefined(response.data.error)) {
+                if (response.data.error) {
                     await new Promise(r => setTimeout(r, 1000));
                     continue;
                 }
