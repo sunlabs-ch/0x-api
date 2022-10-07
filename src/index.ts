@@ -21,7 +21,7 @@ if (require.main === module) {
     if (clusterWorkerSize > 1) {
         if (cluster.isMaster) {
             for (let i = 0; i < clusterWorkerSize; i++) {
-                cluster.fork();
+                cluster.fork({ ETHEREUM_RPC_URL: process.env['ETHEREUM_RPC_URL'] as string });
             }
             cluster.on("exit", function (worker: any) {
                 console.log("Worker", worker.id, " has exited.")
