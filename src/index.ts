@@ -5,25 +5,7 @@ import { providerUtils } from './utils/provider_utils';
 const os = require("os");
 const cluster = require("cluster");
 
-if (!process.env["ETHEREUM_RPC_URL_00"]) process.exit(1);
-let ethRpcUrl: string = process.env["ETHEREUM_RPC_URL_00"] as string;
-const rpcArr: { [key: string]: string }[] = [];
-
-if (cluster.isMaster) {
-    for (let i = 0; true; i++) {
-        const rpcEnv = "ETHEREUM_RPC_URL_" + i.toString().padStart(2, "0");
-        if (!process.env[rpcEnv]) {
-            break;
-        }
-        rpcArr.push({ ETHEREUM_RPC_URL: process.env[rpcEnv] as string });
-    };
-} else {
-    if (!process.env["ETHEREUM_RPC_URL"]) process.exit(1);
-    ethRpcUrl = process.env["ETHEREUM_RPC_URL"] as string;
-}
-
-const clusterWorkerSize = Math.min(os.cpus().length * 2, rpcArr.length);
-
+const clusterWorkerSize = os.cpus().length * 2;
 
 if (require.main === module) {
     const mainLoop = async () => {
@@ -39,7 +21,7 @@ if (require.main === module) {
     if (clusterWorkerSize > 1) {
         if (cluster.isMaster) {
             for (let i = 0; i < clusterWorkerSize; i++) {
-                cluster.fork(rpcArr[i]);
+                cluster.fork();
             }
             cluster.on("exit", function (worker: any) {
                 console.log("Worker", worker.id, " has exited.")
