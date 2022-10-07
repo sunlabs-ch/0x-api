@@ -1,5 +1,6 @@
 import { ChainId } from '@0x/contract-addresses';
 import { BigNumber, NULL_BYTES } from '@0x/utils';
+import { BlockParam } from 'ethereum-types';
 
 import { ERC20BridgeSamplerContract } from '../../../wrappers';
 import { SamplerOverrides } from '../../types';
@@ -173,7 +174,7 @@ export class DexOrderSampler extends SamplerOperations {
      * Run a series of operations from `DexOrderSampler.ops` in a single transaction.
      * Takes an arbitrary length array, but is not typesafe.
      */
-    public async executeBatchAsync<T extends BatchedOperation<any>[]>(ops: T): Promise<any[]> {
+    public async executeBatchAsync<T extends BatchedOperation<any>[]>(ops: T, forceBlock: BlockParam | undefined  = undefined): Promise<any[]> {
         const callDatas = ops.map((o) => o.encodeCall());
         const { overrides, block } = this._samplerOverrides
             ? this._samplerOverrides
@@ -186,7 +187,7 @@ export class DexOrderSampler extends SamplerOperations {
         // Execute all non-empty calldatas.
         const rawCallResults = await this._samplerContract
             .batchCall(callDatas.filter((cd) => cd !== NULL_BYTES))
-            .callAsync({ overrides }, block);
+            .callAsync({ overrides }, forceBlock || block);
         // Return the parsed results.
         let rawCallResultsIdx = 0;
         return callDatas.map((callData, i) => {

@@ -12,7 +12,7 @@ import * as HttpStatus from 'http-status-codes';
 import { Kafka, Producer } from 'kafkajs';
 import _ = require('lodash');
 import { Counter, Histogram } from 'prom-client';
-import { Web3Wrapper, BlockParam } from '@0x/web3-wrapper';
+import { Web3Wrapper, BlockParam, BlockParamLiteral } from '@0x/web3-wrapper';
 
 import { ChainId, ERC20BridgeSource, RfqRequestOpts, SwapQuoterError } from '../asset-swapper';
 import {
@@ -63,8 +63,8 @@ import { schemaUtils } from '../utils/schema_utils';
 import { serviceUtils } from '../utils/service_utils';
 import { isUndefined } from 'lodash';
 
-const SOURCE_FILTERS = require("@0x/asset-swapper/lib/src/utils/market_operation_utils/source_filters");
-const SOURCE_TYPES = require("@0x/asset-swapper/lib/src/utils/market_operation_utils/types");
+const SOURCE_FILTERS = require("../asset-swapper/utils/market_operation_utils/source_filters");
+const SOURCE_TYPES = require("../asset-swapper/utils/market_operation_utils/types");
 import { zeroExGasApiUtils } from '../utils/zero_ex_gas_api_utils';
 
 let kafkaProducer: Producer | undefined;
@@ -229,7 +229,7 @@ export class SwapHandlers {
             ]);
         }
         const _sampler = this._swapService._swapQuoter._marketOperationUtils._sampler;
-        const currentBlockRaw: number[] = await _sampler.executeBatchAsync([_sampler.getBlockNumber()], "latest");
+        const currentBlockRaw: number[] = await _sampler.executeBatchAsync([_sampler.getBlockNumber()], BlockParamLiteral.Latest);
         const currentBlock: number = Number(currentBlockRaw[0]);
         const startBlock: number = !startBlockRaw ? currentBlock : startBlockRaw;
         if (startBlock < 1 || startBlock > currentBlock) {

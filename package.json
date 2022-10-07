@@ -8,7 +8,7 @@
     "scripts": {
         "clean": "shx rm -rf lib test/generated-artifacts test/generated-wrappers generated-artifacts generated-wrappers",
         "clean:ts": "shx rm -rf lib",
-        "pre_build": "cp overwrite/index.js node_modules/@0x/asset-swapper/lib/src/utils/market_operation_utils/ && cp overwrite/sampler.js node_modules/@0x/asset-swapper/lib/src/utils/market_operation_utils/ && cp overwrite/swap_quoter.d.ts node_modules/@0x/asset-swapper/lib/src/ && run-s compile contracts:gen generate_contract_wrappers contracts:copy",
+        "pre_build": "run-s compile contracts:gen generate_contract_wrappers contracts:copy",
         "build": "yarn pre_build && tsc -p tsconfig.json",
         "build:ts": "tsc -b",
         "compile": "sol-compiler",

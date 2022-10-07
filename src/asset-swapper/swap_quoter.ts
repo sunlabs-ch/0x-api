@@ -66,7 +66,7 @@ export class SwapQuoter {
     public readonly permittedOrderFeeTypes: Set<OrderPrunerPermittedFeeTypes>;
     private readonly _contractAddresses: AssetSwapperContractAddresses;
     private readonly _protocolFeeUtils: ProtocolFeeUtils;
-    private readonly _marketOperationUtils: MarketOperationUtils;
+    public readonly _marketOperationUtils: MarketOperationUtils;
     private readonly _rfqtOptions?: SwapQuoterRfqOpts;
     private readonly _integratorIdsSet: Set<string>;
 

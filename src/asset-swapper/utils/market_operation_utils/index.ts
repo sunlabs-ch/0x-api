@@ -118,7 +118,7 @@ export class MarketOperationUtils {
     }
 
     constructor(
-        private readonly _sampler: DexOrderSampler,
+        public readonly _sampler: DexOrderSampler,
         private readonly contractAddresses: AssetSwapperContractAddresses,
     ) {
         this._buySources = BUY_SOURCE_FILTER_BY_CHAIN_ID[_sampler.chainId];
