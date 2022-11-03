@@ -120,7 +120,8 @@ export class RPCSubprovider extends Subprovider {
         for (let i = 0; i < 5; i++) {
             try {
                 response = await retryable();
-                if (response.data.error) {
+                console.log(response);
+                if (response?.data?.error) {
                     await new Promise(r => setTimeout(r, 1000));
                     continue;
                 }
