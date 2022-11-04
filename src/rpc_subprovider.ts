@@ -83,7 +83,7 @@ export class RPCSubprovider extends Subprovider {
         const finalPayload = Subprovider._createFinalPayload(payload);
         const cachingHeaders: any = {};
         finalPayload.id = 0;
-        if (finalPayload?.params && finalPayload.params[1] !== 'latest') {
+        if (finalPayload?.params && finalPayload.params[0]?.data && finalPayload.params[1] !== 'latest') {
             cachingHeaders['X-Hash'] = createHash('sha512')
                 .update(finalPayload.params[1] + ' ' + finalPayload.params[0].data)
                 .digest('base64');
@@ -120,7 +120,6 @@ export class RPCSubprovider extends Subprovider {
         for (let i = 0; i < 5; i++) {
             try {
                 response = await retryable();
-                console.log(response);
                 if (response?.data?.error) {
                     await new Promise(r => setTimeout(r, 1000));
                     continue;

@@ -13,6 +13,9 @@ module.exports = {
       name: "0x API",
       script: "lib/src/index.js",
       args: "",
+      env: {
+      	NODE_ENV: "production",
+      },
     },
     {
       ...defaultConfig,
