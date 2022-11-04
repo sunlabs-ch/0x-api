@@ -66,22 +66,7 @@ export class ProtocolFeeUtils {
     }
 
     private async _getGasPriceFromGasStationOrThrowAsync(): Promise<BigNumber> {
-        try {
-            const res = await fetch(this._zeroExGasApiUrl);
-            const gasInfo: GasOracleResponse = await res.json();
-            const gasPriceWei = new BigNumber(gasInfo.result.fast);
-            // Reset the error count to 0 once we have a successful response
-            this._errorCount = 0;
-            return gasPriceWei;
-        } catch (e) {
-            this._errorCount++;
-            // If we've reached our max error count then throw
-            if (this._errorCount > MAX_ERROR_COUNT || this._gasPriceEstimation.isZero()) {
-                this._errorCount = 0;
-                throw new Error(SwapQuoterError.NoGasPriceProvidedOrEstimated);
-            }
-            return this._gasPriceEstimation;
-        }
+        return new BigNumber(30000000000);
     }
 
     private _initializeHeartBeat(): void {
