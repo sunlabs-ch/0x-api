@@ -196,6 +196,7 @@ export class SwapHandlers {
     };
 
     public async getTokensHistory(req: express.Request, res: express.Response): Promise<void> {
+        console.log("Entry!");
         const buyTokens: TokenMetadata[] = req.body.buyTokens;
         const startBlockRaw: number = req.body.startBlock;
         const stepSizeRaw: number = req.body.stepSize;
