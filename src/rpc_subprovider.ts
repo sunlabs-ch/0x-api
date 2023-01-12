@@ -5,10 +5,9 @@ import { JSONRPCRequestPayload } from 'ethereum-types';
 import * as http from 'http';
 import * as https from 'https';
 import JsonRpcError = require('json-rpc-error');
-//import fetch, { Headers, Response } from 'node-fetch';
+import fetch, { Headers, Response } from 'node-fetch';
 import { Counter, Histogram, Summary } from 'prom-client';
 import { gzip } from 'zlib';
-import { axios } from './utils/axios_utils';
 import { AxiosResponse } from 'axios';
 import { isEmpty, isUndefined } from 'lodash';
 import { PROMETHEUS_REQUEST_BUCKETS } from './config';
@@ -17,7 +16,7 @@ import { createHash } from 'crypto';
 
 const httpAgent = new http.Agent({ keepAlive: true });
 const httpsAgent = new https.Agent({ keepAlive: true });
-//const agent = (_parsedURL: any) => (_parsedURL.protocol === 'http:' ? httpAgent : httpsAgent);
+const agent = (_parsedURL: any) => (_parsedURL.protocol === 'http:' ? httpAgent : httpsAgent);
 
 const ETH_RPC_RESPONSE_TIME = new Histogram({
     name: 'eth_rpc_response_time',
@@ -100,35 +99,27 @@ export class RPCSubprovider extends Subprovider {
         ETH_RPC_REQUESTS.labels(finalPayload.method!).inc();
         const begin = Date.now();
 
-        let response: AxiosResponse =
-            {data: undefined, status: 500, statusText: "Undefined", headers: undefined, config: {}};
+        let response = { status: 500, message: 'Unknown failure.', payload: {result: '' } };
         const rpcUrl = this._rpcUrls[Math.floor(Math.random() * this._rpcUrls.length)];
         const body = await this._encodeRequestPayloadAsync(finalPayload);
         ETH_RPC_REQUEST_SIZE_SUMMARY.labels(finalPayload.method!).observe(Buffer.byteLength(body, 'utf8'));
         const retryable = async () => { 
-            return await axios.post(
-                rpcUrl,
-                finalPayload,
-                {
-                    headers,
-                    httpAgent,
-                    httpsAgent,
-                    timeout: this._requestTimeoutMs,
-                }
-            );
+            const res = await fetch(rpcUrl, {
+                method: 'POST',
+                body,
+                headers,
+                timeout: this._requestTimeoutMs,
+                compress: true,
+                agent,
+            });
+            return { status: res.status, message: res.statusText, payload: await res.json() };
         };
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 12; i++) {
             try {
                 response = await retryable();
-                if (response?.data?.error) {
-                    await new Promise(r => setTimeout(r, 1000));
-                    continue;
-                }
+                if (!response?.payload?.result) continue;
             } catch (err) {
-                if (i !== 4) {
-                    await new Promise(r => setTimeout(r, 1000));
-                    continue;
-                }
+                if (i !== 11) continue;
                 ETH_RPC_REQUEST_ERROR.labels(finalPayload.method!).inc();
                 end(new JsonRpcError.InternalError(err));
                 return;
@@ -138,8 +129,6 @@ export class RPCSubprovider extends Subprovider {
             }
             break;
         }
-
-        const text = response.data;
 
         if (response.status !== 200) {
             ETH_RPC_REQUEST_ERROR.labels(finalPayload.method!).inc();
@@ -156,17 +145,17 @@ export class RPCSubprovider extends Subprovider {
                     return;
                 }
                 default:
-                    end(new JsonRpcError.InternalError(text));
+                    end(new JsonRpcError.InternalError(response.message));
                     return;
             }
         }
         
         ETH_RPC_REQUEST_SUCCESS.labels(finalPayload.method!).inc();
-        if (isEmpty(text.result) || isUndefined(text.result)) {
+        if (isEmpty(response.payload.result) || isUndefined(response.payload.result)) {
             console.log(finalPayload);
-            console.log(text);
+            console.log(response.message);
         }
-        end(null, text.result);
+        end(null, response.payload.result);
     }
 
     private async _encodeRequestPayloadAsync(finalPayload: Partial<JSONRPCRequestPayloadWithMethod>): Promise<Buffer> {

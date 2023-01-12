@@ -7,21 +7,21 @@ const defaultConfig = {
 };
 
 module.exports = {
-  apps: [
-    {
-      ...defaultConfig,
-      name: "0x API",
-      script: "lib/src/index.js",
-      args: "",
-      env: {
-      	NODE_ENV: "production",
-      },
-    },
-    {
-      ...defaultConfig,
-      name: "Postgres",
-      script: "/usr/bin/sudo",
-      args: "-E -u postgres postgres -D /var/lib/postgresql/data",
-    },
-  ],
+    apps: [
+        {
+            ...defaultConfig,
+            name: '0x API',
+            script: 'lib/src/index.js',
+            args: '',
+            env: {
+                NODE_ENV: 'production',
+            },
+        },
+        {
+            ...defaultConfig,
+            name: 'Postgres',
+            script: '/usr/bin/sudo',
+            args: '-E -u postgres postgres -D /var/lib/postgresql/data',
+        },
+    ],
 };
