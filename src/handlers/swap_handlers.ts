@@ -246,7 +246,7 @@ export class SwapHandlers {
                 await Promise.all(
                     queryTokenChunks.map(async (tokens, j: number) => {
                         buyAddresses = tokens.map((t) => t.tokenAddress.toLowerCase());
-                        buyAmounts = tokens.map((t) => Web3Wrapper.toBaseUnitAmount(10, t.decimals));
+                        buyAmounts = tokens.map((t) => Web3Wrapper.toBaseUnitAmount(1, t.decimals));
                         const ops = precise ? [
                             ...tokens.map((t, i) => _sampler.getBuyQuotes(
                                 buySources.sources,
@@ -305,7 +305,7 @@ export class SwapHandlers {
                             } else {
                                 takerAmount = q[0].output;
                             }
-                            const unitTakerAmount = Web3Wrapper.toUnitAmount(new BigNumber(takerAmount), 7);
+                            const unitTakerAmount = Web3Wrapper.toUnitAmount(new BigNumber(takerAmount), 6);
                             const price = unitTakerAmount
                                 .decimalPlaces(6, BigNumber.ROUND_CEIL);
                             prices.push({
