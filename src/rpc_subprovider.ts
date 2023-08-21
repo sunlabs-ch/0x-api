@@ -152,8 +152,8 @@ export class RPCSubprovider extends Subprovider {
         
         ETH_RPC_REQUEST_SUCCESS.labels(finalPayload.method!).inc();
         if (isEmpty(response.payload.result) || isUndefined(response.payload.result)) {
-            console.log(finalPayload);
-            console.log(response.message);
+            console.log(JSON.stringify(finalPayload));
+            console.log(JSON.stringify(response));
         }
         end(null, response.payload.result);
     }
